@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>รายงานเวลาทำงาน</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --teal:#0B9E82;--teal2:#0D7A65;--teal-light:#E8F8F5;
+  --orange:#FF7043;--orange-light:#FFF3E0;
+  --red:#E53935;--red-light:#FFEBEE;
+  --green:#2E7D32;--green-light:#E8F5E9;
+  --blue:#1565C0;--blue-light:#E3F2FD;
+  --gray:#F5F6FA;--border:#E8E9F0;--text:#1A1A2E;--text2:#4A4A6A;--text3:#8A8AAA;
+  --white:#fff;--shadow:0 2px 8px rgba(0,0,0,0.08)
+}
+body{font-family:'Helvetica Neue',Arial,sans-serif;background:var(--gray);color:var(--text);font-size:13px}
+.header{background:linear-gradient(135deg,var(--teal),var(--teal2));padding:16px 20px;color:#fff;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.header h1{font-size:18px;font-weight:700}
+.header p{font-size:12px;color:rgba(255,255,255,0.8);margin-top:2px}
+.controls{background:var(--white);padding:14px 20px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.ctrl-group{display:flex;flex-direction:column;gap:4px}
+.ctrl-group label{font-size:11px;font-weight:600;color:var(--text2)}
+.ctrl-group select,.ctrl-group input{padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;background:var(--gray);color:var(--text);outline:none}
+.ctrl-group select:focus,.ctrl-group input:focus{border-color:var(--teal)}
+.btn{padding:9px 18px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+.btn-search{background:var(--teal);color:#fff}
+.btn-export{background:#217346;color:#fff}
+.btn-day{background:var(--blue);color:#fff}
+.btn:active{transform:scale(0.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.summary-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;padding:14px 20px;background:var(--white);border-bottom:1px solid var(--border)}
+.sum-box{background:var(--gray);border-radius:10px;padding:10px 14px;text-align:center}
+.sum-num{font-size:22px;font-weight:800}
+.sum-lbl{font-size:10px;color:var(--text3);margin-top:2px}
+
+.content{padding:16px 20px}
+.table-wrap{background:var(--white);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+.table-title{padding:12px 16px;font-size:14px;font-weight:700;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#F0FBF8;padding:10px 12px;text-align:center;font-weight:600;color:var(--teal2);border-bottom:2px solid var(--teal-light);white-space:nowrap}
+th.left{text-align:left}
+td{padding:9px 12px;text-align:center;border-bottom:1px solid var(--border);color:var(--text)}
+td.left{text-align:left}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#F8FFFE}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px}
+.badge-ok{background:var(--green-light);color:var(--green)}
+.badge-late{background:var(--orange-light);color:var(--orange)}
+.badge-absent{background:var(--red-light);color:var(--red)}
+.badge-leave{background:var(--blue-light);color:var(--blue)}
+.badge-holiday{background:#F3E5F5;color:#6A1B9A}
+.late-min{color:var(--orange);font-weight:600}
+.ot-hrs{color:var(--blue);font-weight:600}
+.loading{text-align:center;padding:40px;color:var(--text3)}
+.empty{text-align:center;padding:40px;color:var(--text3)}
+.emp-section{margin-bottom:24px}
+.emp-header{background:linear-gradient(135deg,#E8F8F5,#D0F4EC);border-radius:10px 10px 0 0;padding:12px 16px;display:flex;align-items:center;gap:10px;border:1px solid rgba(11,158,130,0.2)}
+.emp-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.emp-name{font-size:14px;font-weight:700;color:var(--teal2)}
+.emp-info{font-size:11px;color:var(--text3);margin-top:2px}
+.emp-stats{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.stat-pill{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
+.summary-row{background:#F0FBF8;font-weight:600}
+.summary-row td{color:var(--teal2);border-top:2px solid var(--teal-light)}
+@media print{
+  .controls,.btn-export,.btn-day,.btn-search{display:none}
+  .header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <a href="attendance-app.html" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;text-decoration:none;flex-shrink:0" title="กลับหน้าหลัก">←</a>
+    <div>
+      <h1>📊 รายงานเวลาทำงาน</h1>
+      <p id="report-period">กำลังโหลด...</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a href="attendance-app.html" class="btn" style="background:rgba(255,255,255,0.2);color:#fff;text-decoration:none">🏠 หน้าหลัก</a>
+    <button class="btn btn-export" onclick="exportExcel()" id="btn-export" disabled>
+      📥 Export Excel
+    </button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <label>ประเภทรายงาน</label>
+    <select id="report-type" onchange="toggleFilter()">
+      <option value="monthly">รายเดือน</option>
+      <option value="range">เลือกช่วงวันที่</option>
+    </select>
+  </div>
+  <div class="ctrl-group" id="filter-monthly">
+    <label>เดือน</label>
+    <input type="month" id="sel-month">
+  </div>
+  <div class="ctrl-group" id="filter-from" style="display:none">
+    <label>ตั้งแต่วันที่</label>
+    <input type="date" id="sel-from">
+  </div>
+  <div class="ctrl-group" id="filter-to" style="display:none">
+    <label>ถึงวันที่</label>
+    <input type="date" id="sel-to">
+  </div>
+  <div class="ctrl-group">
+    <label>พนักงาน</label>
+    <select id="sel-emp">
+      <option value="all">ทุกคน</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>สาขา</label>
+    <select id="sel-branch">
+      <option value="all">ทุกสาขา</option>
+    </select>
+  </div>
+  <button class="btn btn-search" onclick="loadReport()">🔍 ดูรายงาน</button>
+</div>
+
+<div class="summary-bar" id="summary-bar" style="display:none">
+  <div class="sum-box"><div class="sum-num" id="s-emp" style="color:var(--teal)">0</div><div class="sum-lbl">พนักงาน</div></div>
+  <div class="sum-box"><div class="sum-num" id="s-days" style="color:var(--green)">0</div><div class="sum-lbl">วันทำงานรวม</div></div>
+  <div class="sum-box"><div class="sum-num" id="s-late" style="color:var(--orange)">0</div><div class="sum-lbl">ครั้งที่สาย</div></div>
+  <div class="sum-box"><div class="sum-num" id="s-late-min" style="color:var(--orange)">0</div><div class="sum-lbl">นาทีสายรวม</div></div>
+  <div class="sum-box"><div class="sum-num" id="s-absent" style="color:var(--red)">0</div><div class="sum-lbl">วันขาด</div></div>
+  <div class="sum-box"><div class="sum-num" id="s-leave" style="color:var(--blue)">0</div><div class="sum-lbl">วันลา</div></div>
+  <div class="sum-box"><div class="sum-num" id="s-ot" style="color:var(--blue)">0</div><div class="sum-lbl">ชม. OT รวม</div></div>
+</div>
+
+<div class="content" id="report-content">
+  <div class="empty">เลือกเดือนหรือช่วงวันที่แล้วกด "ดูรายงาน"</div>
+</div>
+
+<script>
+const SB_URL='https://ihtpdwgdbcxojpmisaaz.supabase.co';
+const SB_KEY='sb_publishable_i8vu7SQnl7LXjCsxMYcVIg_TebMf2MC';
+const{createClient}=supabase;
+const db=createClient(SB_URL,SB_KEY);
+
+let allEmps=[],allBranches=[],allShifts=[],reportData=[];
+const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
+const DAYS=['อา','จ','อ','พ','พฤ','ศ','ส'];
+const MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+function fmtT(ts){
+  if(!ts)return'--';
+  const d=new Date(ts);
+  return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+function fmtDate(d){
+  if(!d)return'';
+  const dt=new Date(d+'T00:00:00');
+  return dt.getDate()+' '+MONTHS[dt.getMonth()]+' '+(dt.getFullYear()+543);
+}
+function fmtDay(d){
+  if(!d)return'';
+  const dt=new Date(d+'T00:00:00');
+  return DAYS[dt.getDay()];
+}
+function diffMins(a,b){return Math.floor((new Date(b)-new Date(a))/60000);}
+function toHHMM(mins){if(mins<=0)return'0:00';return Math.floor(mins/60)+':'+String(mins%60).padStart(2,'0');}
+
+function toggleFilter(){
+  const t=document.getElementById('report-type').value;
+  document.getElementById('filter-monthly').style.display=t==='monthly'?'flex':'none';
+  document.getElementById('filter-from').style.display=t==='range'?'flex':'none';
+  document.getElementById('filter-to').style.display=t==='range'?'flex':'none';
+}
+
+async function init(){
+  // Set default month
+  const now=new Date();
+  document.getElementById('sel-month').value=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');
+  document.getElementById('sel-from').value=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
+  document.getElementById('sel-to').value=now.toISOString().split('T')[0];
+
+  const[{data:emps},{data:branches},{data:shifts}]=await Promise.all([
+    db.from('employees').select('*').order('name'),
+    db.from('branches').select('*').order('name'),
+    db.from('shifts').select('*')
+  ]);
+  allEmps=emps||[];allBranches=branches||[];allShifts=shifts||[];
+
+  const empSel=document.getElementById('sel-emp');
+  allEmps.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.name;empSel.appendChild(o);});
+  const brSel=document.getElementById('sel-branch');
+  allBranches.forEach(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=b.name;brSel.appendChild(o);});
+}
+
+function getDateRange(){
+  const t=document.getElementById('report-type').value;
+  if(t==='monthly'){
+    const ym=document.getElementById('sel-month').value;
+    const[y,m]=ym.split('-');
+    return{start:`${y}-${m}-01`,end:new Date(y,m,0).toISOString().split('T')[0],label:`${MONTHS[parseInt(m)-1]} ${parseInt(y)+543}`};
+  } else {
+    const from=document.getElementById('sel-from').value;
+    const to=document.getElementById('sel-to').value;
+    return{start:from,end:to,label:`${fmtDate(from)} – ${fmtDate(to)}`};
+  }
+}
+
+async function loadReport(){
+  document.getElementById('report-content').innerHTML='<div class="loading">⏳ กำลังโหลดข้อมูล...</div>';
+  document.getElementById('summary-bar').style.display='none';
+  document.getElementById('btn-export').disabled=true;
+
+  const{start,end,label}=getDateRange();
+  const empFilter=document.getElementById('sel-emp').value;
+  const brFilter=document.getElementById('sel-branch').value;
+  document.getElementById('report-period').textContent=`ช่วงเวลา: ${label}`;
+
+  // Load attendance
+  let attQ=db.from('attendance').select('*').gte('work_date',start).lte('work_date',end).order('work_date');
+  const{data:atts}=await attQ;
+
+  // Load leaves
+  const{data:leaves}=await db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end);
+
+  // Filter emps
+  let emps=allEmps;
+  if(empFilter!=='all') emps=emps.filter(e=>e.id===empFilter);
+  if(brFilter!=='all') emps=emps.filter(e=>e.branch_id===brFilter);
+
+  // Build date list
+  const dates=[];
+  const cur=new Date(start+'T00:00:00');
+  const endD=new Date(end+'T00:00:00');
+  while(cur<=endD){dates.push(cur.toISOString().split('T')[0]);cur.setDate(cur.getDate()+1);}
+
+  // Build report data
+  reportData=[];
+  let totDays=0,totLate=0,totLateMin=0,totAbsent=0,totLeave=0,totOT=0;
+
+  const html=emps.map((emp,ei)=>{
+    const shift=allShifts.find(x=>x.id===emp.shift_id);
+    const [avBg,avTx]=AV[ei%5];
+    const empAtts=(atts||[]).filter(a=>a.employee_id===emp.id);
+    const empLeaves=(leaves||[]).filter(l=>l.employee_id===emp.id);
+
+    let empDays=0,empLate=0,empLateMin=0,empAbsent=0,empLeave=0,empOT=0;
+    const rows=[];
+    const empRawData=[];
+
+    dates.forEach(date=>{
+      const dt=new Date(date+'T00:00:00');
+      const att=empAtts.find(a=>a.work_date===date);
+      const lv=empLeaves.find(l=>l.start_date<=date&&l.end_date>=date);
+
+      let status='',cin='--',cout='--',workMins=0,lateMins=0,otMins=0,note='',rowClass='';
+
+      if(lv){
+        status='leave';empLeave++;totLeave++;
+        const typeMap={sick:'ลาป่วย',personal:'ลากิจ',vacation:'ลาพักร้อน'};
+        note=typeMap[lv.leave_type]||lv.leave_type;
+      } else if(att?.check_in){
+        empDays++;totDays++;
+        cin=fmtT(att.check_in);
+        cout=att.check_out?fmtT(att.check_out):'(ยังอยู่)';
+        if(att.check_out) workMins=diffMins(att.check_in,att.check_out);
+        if(shift){
+          const[sh,sm]=shift.check_in_time.split(':').map(Number);
+          const cinD=new Date(att.check_in);
+          lateMins=Math.max(0,(cinD.getHours()*60+cinD.getMinutes())-(sh*60+sm));
+          if(lateMins>5){empLate++;empLateMin+=lateMins;totLate++;totLateMin+=lateMins;status='late';}
+          else status='ok';
+          // OT
+          if(shift.has_ot&&att.ot_minutes){otMins=att.ot_minutes;empOT+=otMins/60;totOT+=otMins/60;}
+        } else status='ok';
+        if(lv) note='';
+      } else {
+        // Check if it's a weekend with no shift
+        const isWeekend=dt.getDay()===0||dt.getDay()===6;
+        if(isWeekend&&!shift){status='holiday';note='วันหยุด';}
+        else{status='absent';empAbsent++;totAbsent++;}
+      }
+
+      const badgeMap={ok:'<span class="badge badge-ok">✅ ปกติ</span>',late:`<span class="badge badge-late">⚠️ สาย ${lateMins}น.</span>`,absent:'<span class="badge badge-absent">❌ ขาด</span>',leave:'<span class="badge badge-leave">📋 ลา</span>',holiday:'<span class="badge badge-holiday">🏖️ หยุด</span>'};
+
+      rows.push(`<tr class="${status==='absent'?'':''}">
+        <td>${dt.getDate()}</td>
+        <td>${fmtDay(date)}</td>
+        <td>${cin}</td>
+        <td>${cout}</td>
+        <td>${workMins>0?toHHMM(workMins):'--'}</td>
+        <td>${lateMins>5?`<span class="late-min">${lateMins}น.</span>`:'--'}</td>
+        <td>${otMins>0?`<span class="ot-hrs">${(otMins/60).toFixed(1)}ชม.</span>`:'--'}</td>
+        <td>${badgeMap[status]||''}</td>
+        <td style="color:var(--text3)">${note}</td>
+      </tr>`);
+
+      // Raw data for export
+      empRawData.push({
+        ชื่อ:emp.name, แผนก:emp.department||'', สาขา:(allBranches.find(b=>b.id===emp.branch_id)||{}).name||'',
+        วันที่:date, วัน:fmtDay(date), เวลาเข้า:cin==='--'?'':cin, เวลาออก:cout==='--'?'':cout,
+        รวมชั่วโมง:workMins>0?toHHMM(workMins):'', สาย_นาที:lateMins>5?lateMins:'', OT_ชม:otMins>0?(otMins/60).toFixed(1):'',
+        สถานะ:status==='ok'?'ปกติ':status==='late'?'สาย':status==='absent'?'ขาด':status==='leave'?'ลา':status==='holiday'?'หยุด':'',
+        หมายเหตุ:note
+      });
+    });
+
+    reportData.push(...empRawData);
+
+    const summaryRow=`<tr class="summary-row">
+      <td colspan="2" class="left">สรุป ${emp.name}</td>
+      <td colspan="2">มาทำงาน <strong>${empDays}</strong> วัน</td>
+      <td>--</td>
+      <td>${empLate>0?`<span class="late-min">${empLate}ครั้ง ${empLateMin}น.</span>`:'ไม่สาย'}</td>
+      <td>${empOT>0?`<span class="ot-hrs">${empOT.toFixed(1)}ชม.</span>`:'--'}</td>
+      <td>${empLate===0&&empLeave===0&&empAbsent===0?'<span class="badge badge-ok">✅ ได้เบี้ย</span>':'<span class="badge badge-absent">❌ ไม่ได้เบี้ย</span>'}</td>
+      <td style="color:var(--text3)">ลา ${empLeave}วัน | ขาด ${empAbsent}วัน</td>
+    </tr>`;
+
+    return`<div class="emp-section">
+      <div class="emp-header">
+        <div class="emp-avatar" style="background:${avBg};color:${avTx}">${emp.name.substring(0,2)}</div>
+        <div>
+          <div class="emp-name">${emp.name}</div>
+          <div class="emp-info">${emp.department||''} · ${shift?shift.shift_name:'ไม่กำหนดกะ'} · ${(allBranches.find(b=>b.id===emp.branch_id)||{}).name||'ไม่กำหนดสาขา'}</div>
+        </div>
+        <div class="emp-stats">
+          <span class="stat-pill" style="background:var(--green-light);color:var(--green)">มา ${empDays} วัน</span>
+          ${empLate>0?`<span class="stat-pill" style="background:var(--orange-light);color:var(--orange)">สาย ${empLate}ครั้ง ${empLateMin}น.</span>`:''}
+          ${empAbsent>0?`<span class="stat-pill" style="background:var(--red-light);color:var(--red)">ขาด ${empAbsent}วัน</span>`:''}
+          ${empLeave>0?`<span class="stat-pill" style="background:var(--blue-light);color:var(--blue)">ลา ${empLeave}วัน</span>`:''}
+          ${empOT>0?`<span class="stat-pill" style="background:#EDE7F6;color:#4527A0">OT ${empOT.toFixed(1)}ชม.</span>`:''}
+        </div>
+      </div>
+      <div class="table-wrap" style="border-radius:0 0 12px 12px">
+        <table>
+          <thead>
+            <tr>
+              <th>วันที่</th><th>วัน</th><th>เวลาเข้า</th><th>เวลาออก</th>
+              <th>รวมเวลา</th><th>สาย(น.)</th><th>OT</th><th>สถานะ</th><th class="left">หมายเหตุ</th>
+            </tr>
+          </thead>
+          <tbody>${rows.join('')}${summaryRow}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('report-content').innerHTML=html||'<div class="empty">ไม่พบข้อมูล</div>';
+  document.getElementById('summary-bar').style.display='grid';
+  document.getElementById('s-emp').textContent=emps.length;
+  document.getElementById('s-days').textContent=totDays;
+  document.getElementById('s-late').textContent=totLate;
+  document.getElementById('s-late-min').textContent=totLateMin;
+  document.getElementById('s-absent').textContent=totAbsent;
+  document.getElementById('s-leave').textContent=totLeave;
+  document.getElementById('s-ot').textContent=totOT.toFixed(1);
+  document.getElementById('btn-export').disabled=false;
+}
+
+function exportExcel(){
+  if(!reportData.length){alert('ไม่มีข้อมูลสำหรับ Export');return;}
+  const{label}=getDateRange();
+  const wb=XLSX.utils.book_new();
+
+  // Sheet 1: Raw data ทุกคน
+  const ws=XLSX.utils.json_to_sheet(reportData);
+  // Column widths
+  ws['!cols']=[{wch:16},{wch:10},{wch:14},{wch:10},{wch:6},{wch:8},{wch:8},{wch:10},{wch:8},{wch:8},{wch:8},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws,'ข้อมูลเวลาทำงาน');
+
+  // Sheet 2: สรุปรายคน
+  const summary=[];
+  const empIds=[...new Set(reportData.map(r=>r.ชื่อ))];
+  empIds.forEach(name=>{
+    const rows=reportData.filter(r=>r.ชื่อ===name);
+    const workDays=rows.filter(r=>r.สถานะ==='ปกติ'||r.สถานะ==='สาย').length;
+    const lateDays=rows.filter(r=>r.สถานะ==='สาย').length;
+    const lateMin=rows.reduce((s,r)=>s+(r.สาย_นาที||0),0);
+    const absentDays=rows.filter(r=>r.สถานะ==='ขาด').length;
+    const leaveDays=rows.filter(r=>r.สถานะ==='ลา').length;
+    const otHrs=rows.reduce((s,r)=>s+parseFloat(r.OT_ชม||0),0);
+    summary.push({ชื่อ:name,แผนก:rows[0]?.แผนก,สาขา:rows[0]?.สาขา,มาทำงาน:workDays,สาย_ครั้ง:lateDays,สาย_นาทีรวม:lateMin,ขาด:absentDays,ลา:leaveDays,OT_ชม:otHrs.toFixed(1),เบี้ยขยัน:lateDays===0&&absentDays===0&&leaveDays===0?'✅ ได้':'❌ ไม่ได้'});
+  });
+  const ws2=XLSX.utils.json_to_sheet(summary);
+  ws2['!cols']=[{wch:16},{wch:10},{wch:14},{wch:10},{wch:8},{wch:12},{wch:8},{wch:8},{wch:8},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws2,'สรุปรายบุคคล');
+
+  XLSX.writeFile(wb,`รายงานเวลา_${label.replace(/ /g,'_')}.xlsx`);
+}
+
+init();
+</script>
+</body>
+</html>
