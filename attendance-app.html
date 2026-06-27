@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบลงเวลา & ลางาน</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --purple:#534AB7;--purple-light:#EEEDFE;--purple-dark:#3C3489;
+  --teal:#1D9E75;--teal-light:#E1F5EE;--teal-dark:#085041;
+  --coral:#D85A30;--coral-light:#FAECE7;
+  --amber:#EF9F27;--amber-light:#FAEEDA;--amber-dark:#633806;
+  --bg:#F4F3F0;--surface:#fff;--border:#E2E1DC;--border-strong:#C8C7C0;
+  --text:#1a1a1a;--text-muted:#6B6A65;--radius:12px;
+}
+body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
+.login-card{background:var(--surface);border-radius:20px;padding:32px 24px;width:100%;max-width:360px;border:0.5px solid var(--border)}
+.login-logo{text-align:center;margin-bottom:24px}
+.login-logo .icon{width:56px;height:56px;border-radius:16px;background:var(--purple);display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:10px}
+.login-logo h1{font-size:18px;font-weight:600}
+.login-logo p{font-size:13px;color:var(--text-muted);margin-top:2px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:6px}
+.form-group select,.form-group input{width:100%;padding:10px 12px;border-radius:8px;border:0.5px solid var(--border);font-size:14px;background:var(--bg);color:var(--text);outline:none}
+.btn-login{width:100%;padding:12px;border-radius:10px;border:none;background:var(--purple);color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.login-error{background:var(--coral-light);color:var(--coral);font-size:12px;padding:8px 12px;border-radius:8px;margin-top:10px;text-align:center;display:none}
+.app-wrap{display:none;max-width:430px;margin:0 auto;min-height:100vh;flex-direction:column}
+.app-wrap.show{display:flex}
+.topbar{background:var(--purple);padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.topbar-left h2{font-size:15px;font-weight:600;color:#fff}
+.topbar-left p{font-size:11px;color:#CECBF6;margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.avatar{width:34px;height:34px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--purple);cursor:pointer}
+.btn-logout{font-size:11px;color:#CECBF6;background:none;border:0.5px solid #AFA9EC;border-radius:6px;padding:4px 8px;cursor:pointer}
+.tabs{display:flex;background:var(--surface);border-bottom:0.5px solid var(--border);position:sticky;top:54px;z-index:9;overflow-x:auto}
+.tab{flex:1;min-width:60px;padding:10px 4px;text-align:center;font-size:10px;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;font-weight:500;white-space:nowrap}
+.tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.page{display:none;padding:14px 14px 80px}
+.page.active{display:block}
+
+/* CARDS */
+.card{background:var(--surface);border-radius:var(--radius);border:0.5px solid var(--border);padding:12px;margin-bottom:10px}
+.sec-title{font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.5px;margin-bottom:8px}
+.loading{text-align:center;padding:20px;color:var(--text-muted);font-size:13px}
+
+/* CLOCK */
+.clock-card{background:var(--purple);border-radius:18px;padding:20px;text-align:center;margin-bottom:14px}
+.clock-time{font-size:42px;font-weight:300;color:#fff;letter-spacing:1px}
+.clock-date{font-size:12px;color:#AFA9EC;margin-top:3px}
+.clock-shift{font-size:11px;color:#CECBF6;margin-top:6px;background:rgba(255,255,255,0.15);display:inline-block;padding:3px 12px;border-radius:20px}
+.clock-status{margin-top:10px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);padding:5px 12px;border-radius:20px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#5DCAA5}
+.status-dot.out{background:#F09595}
+.clock-status span{font-size:12px;color:#CECBF6}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.btn-in{padding:14px;border-radius:12px;border:none;background:var(--teal);color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.btn-out{padding:14px;border-radius:12px;border:0.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;font-weight:600;cursor:pointer}
+.btn-in:disabled,.btn-out:disabled{opacity:.5;cursor:not-allowed}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.stat-box{background:var(--surface);border-radius:10px;border:0.5px solid var(--border);padding:12px}
+.stat-label{font-size:11px;color:var(--text-muted)}
+.stat-val{font-size:22px;font-weight:600;color:var(--text);margin-top:2px}
+.stat-sub{font-size:10px;color:var(--text-muted);margin-top:1px}
+.log-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.log-item:last-child{border-bottom:none}
+.log-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.log-icon.in{background:var(--teal-light)}
+.log-icon.out{background:var(--coral-light)}
+.log-body{flex:1}
+.log-name{font-size:13px;font-weight:500}
+.log-sub{font-size:11px;color:var(--text-muted);margin-top:1px}
+.log-time{font-size:13px;font-weight:600;color:var(--text-muted)}
+
+/* LEAVE */
+.quota-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.quota-box{border-radius:10px;padding:10px 12px}
+.quota-type{font-size:11px;font-weight:600;margin-bottom:2px}
+.quota-val{font-size:20px;font-weight:700}
+.quota-bar{height:4px;border-radius:2px;background:rgba(0,0,0,0.1);margin-top:4px;overflow:hidden}
+.quota-fill{height:100%;border-radius:2px}
+.quota-used{font-size:10px;margin-top:3px;opacity:.7}
+.leave-card{background:var(--surface);border-radius:10px;border:0.5px solid var(--border);padding:12px;margin-bottom:8px}
+.leave-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.leave-type{font-size:12px;font-weight:600;padding:3px 8px;border-radius:20px}
+.leave-status{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
+.status-pending{background:var(--amber-light);color:var(--amber-dark)}
+.status-approved{background:var(--teal-light);color:var(--teal-dark)}
+.status-rejected{background:var(--coral-light);color:var(--coral)}
+.leave-dates{font-size:12px;color:var(--text-muted)}
+.leave-reason{font-size:12px;color:var(--text);margin-top:3px}
+.btn-add{width:100%;padding:12px;border-radius:10px;border:none;background:var(--purple);color:#fff;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px}
+
+/* BONUS */
+.bonus-hero{background:linear-gradient(135deg,#534AB7,#3C3489);border-radius:18px;padding:20px;text-align:center;margin-bottom:14px;color:#fff}
+.bonus-amount{font-size:40px;font-weight:600;color:#fff}
+.bonus-label{font-size:12px;color:#CECBF6;margin-top:2px}
+.bonus-streak{margin-top:12px;display:flex;justify-content:center;gap:8px}
+.streak-dot{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:rgba(255,255,255,0.5)}
+.streak-dot.filled{background:#FAC775;border-color:#FAC775;color:#412402}
+.bonus-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.bonus-box{background:var(--surface);border-radius:10px;border:0.5px solid var(--border);padding:10px 8px;text-align:center}
+.bonus-box-val{font-size:18px;font-weight:700}
+.bonus-box-label{font-size:10px;color:var(--text-muted);margin-top:2px}
+.bonus-history{background:var(--surface);border-radius:10px;border:0.5px solid var(--border);overflow:hidden}
+.bonus-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:0.5px solid var(--border);font-size:13px}
+.bonus-row:last-child{border-bottom:none}
+.bonus-month{font-weight:500}
+.bonus-amt{font-weight:700;color:var(--teal-dark)}
+.bonus-amt.zero{color:var(--text-muted)}
+
+/* REPORT */
+.report-tabs{display:flex;gap:6px;margin-bottom:12px}
+.report-tab{flex:1;padding:7px;border-radius:8px;border:0.5px solid var(--border);background:var(--surface);font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;text-align:center}
+.report-tab.active{background:var(--purple);color:#fff;border-color:var(--purple)}
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.sum-box{background:var(--surface);border-radius:10px;border:0.5px solid var(--border);padding:8px 6px;text-align:center}
+.sum-val{font-size:18px;font-weight:700}
+.sum-label{font-size:10px;color:var(--text-muted);margin-top:1px}
+.emp-row{background:var(--surface);border-radius:10px;border:0.5px solid var(--border);padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.emp-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.emp-info{flex:1}
+.emp-name{font-size:13px;font-weight:600}
+.emp-dept{font-size:11px;color:var(--text-muted)}
+.emp-badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
+
+/* EMPLOYEES */
+.emp-manage-row{background:var(--surface);border-radius:10px;border:0.5px solid var(--border);padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;padding:20px 16px 32px;width:100%;max-width:430px;max-height:85vh;overflow-y:auto}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.modal-close{font-size:20px;color:var(--text-muted);cursor:pointer;background:none;border:none}
+.modal label{display:block;font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:4px;margin-top:10px}
+.modal select,.modal input,.modal textarea{width:100%;padding:10px 12px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--bg);color:var(--text);outline:none;font-family:inherit}
+.modal textarea{min-height:60px;resize:vertical}
+.btn-submit{width:100%;padding:13px;border-radius:10px;border:none;background:var(--purple);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:14px}
+.btn-danger{width:100%;padding:11px;border-radius:10px;border:none;background:var(--coral-light);color:var(--coral);font-size:13px;font-weight:600;cursor:pointer;margin-top:8px}
+.approve-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.btn-reject{padding:12px;border-radius:10px;border:none;background:var(--coral-light);color:var(--coral);font-size:13px;font-weight:600;cursor:pointer}
+.btn-approve{padding:12px;border-radius:10px;border:none;background:var(--teal);color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px}
+.detail-row:last-of-type{border-bottom:none}
+.detail-label{color:var(--text-muted)}
+.date-select{display:flex;gap:8px;margin-bottom:12px}
+.date-select input,.date-select select{flex:1;padding:8px 10px;border-radius:8px;border:0.5px solid var(--border);font-size:13px;background:var(--surface);color:var(--text);outline:none}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;font-size:13px;font-weight:500;padding:10px 20px;border-radius:20px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+.ot-badge{background:#FAEEDA;color:#633806;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="icon">🕐</div>
+      <h1>ระบบลงเวลา</h1>
+      <p>เข้าสู่ระบบเพื่อใช้งาน</p>
+    </div>
+    <div class="form-group">
+      <label>เลือกชื่อของคุณ</label>
+      <select id="login-name"><option value="">-- เลือกชื่อ --</option></select>
+    </div>
+    <div class="form-group">
+      <label>รหัส PIN (4 หลัก)</label>
+      <input type="password" id="login-pin" maxlength="4" placeholder="****" inputmode="numeric">
+    </div>
+    <button class="btn-login" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <div class="login-error" id="login-error">PIN ไม่ถูกต้อง กรุณาลองใหม่</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-wrap" id="app-wrap">
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2>ระบบลงเวลา</h2>
+      <p id="topbar-sub">กำลังโหลด...</p>
+    </div>
+    <div class="topbar-right">
+      <div class="avatar" id="user-avatar">?</div>
+      <button class="btn-logout" onclick="doLogout()">ออก</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showPage('clock')">🕐 ลงเวลา</div>
+    <div class="tab" onclick="showPage('leave')">📋 ลางาน</div>
+    <div class="tab" onclick="showPage('bonus')">💰 เบี้ยขยัน</div>
+    <div class="tab hr-only" onclick="showPage('report')" style="display:none">📊 รายงาน</div>
+    <div class="tab hr-only" onclick="showPage('approve')" id="approve-tab" style="display:none">✅ อนุมัติ</div>
+    <div class="tab hr-only" onclick="showPage('employees')" style="display:none">👥 พนักงาน</div>
+  </div>
+
+  <!-- CLOCK PAGE -->
+  <div class="page active" id="page-clock">
+    <div class="clock-card">
+      <div class="clock-time" id="live-time">--:--:--</div>
+      <div class="clock-date" id="live-date">--</div>
+      <div class="clock-shift" id="live-shift">กำลังโหลดกะ...</div>
+      <div class="clock-status">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-label">กำลังโหลด...</span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-in" id="btn-checkin" onclick="doCheckin()">✅ เช็คอิน</button>
+      <button class="btn-out" id="btn-checkout" onclick="doCheckout()">🚪 เช็คเอาท์</button>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">วันนี้ทำงาน</div>
+        <div class="stat-val" id="today-hrs">0 ชม.</div>
+        <div class="stat-sub" id="today-sub">ยังไม่เริ่ม</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">เดือนนี้</div>
+        <div class="stat-val" id="month-days">0 วัน</div>
+        <div class="stat-sub">มาทำงาน</div>
+      </div>
+    </div>
+    <div class="sec-title">บันทึกวันนี้</div>
+    <div class="card" id="log-list"><div class="loading">กำลังโหลด...</div></div>
+  </div>
+
+  <!-- LEAVE PAGE -->
+  <div class="page" id="page-leave">
+    <div class="sec-title">วันลาคงเหลือ</div>
+    <div class="quota-grid">
+      <div class="quota-box" style="background:#FAECE7">
+        <div class="quota-type" style="color:#712B13">🏥 ลาป่วย</div>
+        <div class="quota-val" style="color:#712B13" id="q-sick">30</div>
+        <div class="quota-bar"><div class="quota-fill" id="qf-sick" style="background:#D85A30;width:0%"></div></div>
+        <div class="quota-used" style="color:#712B13" id="qu-sick">ใช้ 0/30 วัน</div>
+      </div>
+      <div class="quota-box" style="background:#EEEDFE">
+        <div class="quota-type" style="color:#3C3489">📋 ลากิจ</div>
+        <div class="quota-val" style="color:#3C3489" id="q-personal">6</div>
+        <div class="quota-bar"><div class="quota-fill" id="qf-personal" style="background:#534AB7;width:0%"></div></div>
+        <div class="quota-used" style="color:#3C3489" id="qu-personal">ใช้ 0/6 วัน</div>
+      </div>
+      <div class="quota-box" style="background:#E1F5EE">
+        <div class="quota-type" style="color:#085041">🌴 พักร้อน</div>
+        <div class="quota-val" style="color:#085041" id="q-vacation">10</div>
+        <div class="quota-bar"><div class="quota-fill" id="qf-vacation" style="background:#1D9E75;width:0%"></div></div>
+        <div class="quota-used" style="color:#085041" id="qu-vacation">ใช้ 0/10 วัน</div>
+      </div>
+      <div class="quota-box" style="background:#FAEEDA">
+        <div class="quota-type" style="color:#633806">⏰ OT สะสม</div>
+        <div class="quota-val" style="color:#633806" id="q-ot">0</div>
+        <div class="quota-bar"><div class="quota-fill" id="qf-ot" style="background:#EF9F27;width:0%"></div></div>
+        <div class="quota-used" style="color:#633806">ชั่วโมง</div>
+      </div>
+    </div>
+    <div class="sec-title">ประวัติการลา</div>
+    <div id="leave-list"><div class="loading">กำลังโหลด...</div></div>
+    <button class="btn-add" onclick="openLeaveForm()">+ ยื่นคำขอลา</button>
+  </div>
+
+  <!-- BONUS PAGE -->
+  <div class="page" id="page-bonus">
+    <div class="bonus-hero">
+      <div style="font-size:12px;color:#CECBF6;margin-bottom:4px">เบี้ยขยันสะสม</div>
+      <div class="bonus-amount" id="bonus-total">฿0</div>
+      <div class="bonus-label" id="bonus-status">กำลังคำนวณ...</div>
+      <div class="bonus-streak" id="bonus-streak"></div>
+    </div>
+    <div class="bonus-grid">
+      <div class="bonus-box">
+        <div class="bonus-box-val" id="b-months" style="color:var(--purple)">0</div>
+        <div class="bonus-box-label">เดือนที่ได้สิทธิ์</div>
+      </div>
+      <div class="bonus-box">
+        <div class="bonus-box-val" id="b-streak" style="color:var(--amber)">0</div>
+        <div class="bonus-box-label">เดือนติดกัน</div>
+      </div>
+      <div class="bonus-box">
+        <div class="bonus-box-val" id="b-next" style="color:var(--teal)">-</div>
+        <div class="bonus-box-label">โบนัสถัดไป</div>
+      </div>
+    </div>
+    <div class="sec-title">เงื่อนไขเบี้ยขยัน</div>
+    <div class="card" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px">
+        <span style="color:var(--text-muted)">ไม่ขาด ไม่ลา ไม่สาย/เดือน</span>
+        <span style="font-weight:700;color:var(--teal-dark)">฿500</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px">
+        <span style="color:var(--text-muted)">สะสม 3 เดือนติด</span>
+        <span style="font-weight:700;color:var(--purple)">+฿1,000</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px">
+        <span style="color:var(--text-muted)">สะสม 12 เดือนติด</span>
+        <span style="font-weight:700;color:var(--amber-dark)">+1.5% ของยอดสะสม</span>
+      </div>
+    </div>
+    <div class="sec-title">ประวัติรายเดือน</div>
+    <div class="bonus-history" id="bonus-history"><div class="loading">กำลังโหลด...</div></div>
+  </div>
+
+  <!-- REPORT PAGE (HR) -->
+  <div class="page" id="page-report">
+    <div class="report-tabs">
+      <div class="report-tab active" id="rt-daily" onclick="switchReport('daily')">รายวัน</div>
+      <div class="report-tab" id="rt-monthly" onclick="switchReport('monthly')">รายเดือน</div>
+      <div class="report-tab" id="rt-bonus" onclick="switchReport('bonus')">เบี้ยขยัน</div>
+    </div>
+    <div id="report-filter-daily" class="date-select">
+      <input type="date" id="report-date" onchange="loadReport()">
+    </div>
+    <div id="report-filter-monthly" class="date-select" style="display:none">
+      <input type="month" id="report-month" onchange="loadMonthlyReport()">
+    </div>
+    <div id="report-filter-bonus" class="date-select" style="display:none">
+      <input type="month" id="report-bonus-month" onchange="loadBonusReport()">
+    </div>
+    <div id="report-content"><div class="loading">กำลังโหลด...</div></div>
+  </div>
+
+  <!-- APPROVE PAGE (HR) -->
+  <div class="page" id="page-approve">
+    <div class="sec-title">รออนุมัติ</div>
+    <div id="approve-list"><div class="loading">กำลังโหลด...</div></div>
+  </div>
+
+  <!-- EMPLOYEES PAGE (HR) -->
+  <div class="page" id="page-employees">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="sec-title" style="margin:0">พนักงาน (<span id="emp-count">0</span> คน)</div>
+      <button onclick="openEmpForm(null)" style="padding:7px 14px;border-radius:8px;border:none;background:var(--purple);color:#fff;font-size:12px;font-weight:600;cursor:pointer">+ เพิ่ม</button>
+    </div>
+    <div id="emp-list-page"><div class="loading">กำลังโหลด...</div></div>
+  </div>
+</div>
+
+<!-- LEAVE MODAL -->
+<div class="modal-overlay" id="leave-modal">
+  <div class="modal">
+    <div class="modal-title">ยื่นคำขอลา <button class="modal-close" onclick="closeLeaveForm()">✕</button></div>
+    <label>ประเภทการลา</label>
+    <select id="leave-type">
+      <option value="sick">🏥 ลาป่วย</option>
+      <option value="personal">📋 ลากิจ</option>
+      <option value="vacation">🌴 ลาพักร้อน</option>
+    </select>
+    <label>วันที่เริ่มลา</label>
+    <input type="date" id="leave-from">
+    <label>วันที่สิ้นสุด</label>
+    <input type="date" id="leave-to">
+    <label>เหตุผล</label>
+    <textarea id="leave-reason" placeholder="ระบุเหตุผล..."></textarea>
+    <button class="btn-submit" onclick="submitLeave()">ส่งคำขอลา</button>
+  </div>
+</div>
+
+<!-- APPROVE DETAIL MODAL -->
+<div class="modal-overlay" id="approve-modal">
+  <div class="modal">
+    <div class="modal-title">พิจารณาคำขอลา <button class="modal-close" onclick="closeApproveModal()">✕</button></div>
+    <div id="approve-detail"></div>
+    <label>หมายเหตุ (ถ้ามี)</label>
+    <textarea id="approve-note" placeholder="เช่น อนุมัติตามที่ขอ..."></textarea>
+    <div class="approve-btns">
+      <button class="btn-reject" onclick="decideLeave('rejected')">❌ ไม่อนุมัติ</button>
+      <button class="btn-approve" onclick="decideLeave('approved')">✅ อนุมัติ</button>
+    </div>
+  </div>
+</div>
+
+<!-- EMPLOYEE MODAL -->
+<div class="modal-overlay" id="emp-modal">
+  <div class="modal">
+    <div class="modal-title"><span id="emp-modal-title">เพิ่มพนักงาน</span> <button class="modal-close" onclick="closeEmpForm()">✕</button></div>
+    <input type="hidden" id="emp-id">
+    <label>ชื่อ-นามสกุล *</label>
+    <input type="text" id="emp-name" placeholder="สมชาย ใจดี">
+    <label>แผนก</label>
+    <input type="text" id="emp-dept" placeholder="บัญชี, IT, HR...">
+    <label>Email *</label>
+    <input type="email" id="emp-email" placeholder="somchai@company.com">
+    <label>PIN (4 หลัก) *</label>
+    <input type="text" id="emp-pin" maxlength="4" placeholder="1234" inputmode="numeric">
+    <label>กะทำงาน</label>
+    <select id="emp-shift">
+      <option value="">-- เลือกกะ --</option>
+    </select>
+    <label>บทบาท</label>
+    <select id="emp-role">
+      <option value="employee">พนักงานทั่วไป</option>
+      <option value="hr">HR / ผู้จัดการ</option>
+    </select>
+    <button class="btn-submit" onclick="saveEmployee()">💾 บันทึก</button>
+    <button class="btn-danger" id="btn-delete-emp" onclick="deleteEmployee()" style="display:none">🗑 ลบพนักงานคนนี้</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://ihtpdwgdbcxojpmisaaz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_i8vu7SQnl7LXjCsxMYcVIg_TebMf2MC';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null, todayAttendance = null, selectedLeaveId = null;
+let allEmployees = [], allShifts = [], bonusConfig = null;
+const QUOTAS = { sick: 30, personal: 6, vacation: 10 };
+const LEAVE_LABELS = { sick: '🏥 ลาป่วย', personal: '📋 ลากิจ', vacation: '🌴 ลาพักร้อน' };
+const AV_BG = ['#EEEDFE','#E1F5EE','#E6F1FB','#FBEAF0','#FAEEDA'];
+const AV_TX = ['#3C3489','#085041','#0C447C','#72243E','#633806'];
+
+function showToast(msg, color='#1a1a1a') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.background = color;
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500);
+}
+function fmtDate(d) {
+  if (!d) return '--';
+  const dt = new Date(d);
+  const m = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  return dt.getDate()+' '+m[dt.getMonth()]+' '+(dt.getFullYear()+543);
+}
+function fmtTime(ts) {
+  if (!ts) return '--';
+  const d = new Date(ts);
+  return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function monthStr(d) {
+  const dt = d || new Date();
+  return dt.getFullYear()+'-'+(dt.getMonth()+1).toString().padStart(2,'0');
+}
+function thaiMonth(ym) {
+  const [y,m] = ym.split('-');
+  const months = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  return months[parseInt(m)]+' '+(parseInt(y)+543);
+}
+
+// ===== AUTH =====
+async function loadEmployeeList() {
+  const { data } = await db.from('employees').select('id,name,role').order('name');
+  const sel = document.getElementById('login-name');
+  if (data) data.forEach(e => {
+    const o = document.createElement('option');
+    o.value = e.id; o.textContent = e.name+(e.role==='hr'?' (HR)':'');
+    sel.appendChild(o);
+  });
+}
+async function doLogin() {
+  const empId = document.getElementById('login-name').value;
+  const pin = document.getElementById('login-pin').value;
+  if (!empId || !pin) { showToast('กรุณาเลือกชื่อและใส่ PIN'); return; }
+  const { data } = await db.from('employees').select('*').eq('id', empId).eq('pin', pin).single();
+  if (!data) { document.getElementById('login-error').style.display = 'block'; return; }
+  currentUser = data;
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('app-wrap').classList.add('show');
+  initApp();
+}
+function doLogout() {
+  currentUser = null; todayAttendance = null;
+  document.getElementById('login-wrap').style.display = 'flex';
+  document.getElementById('app-wrap').classList.remove('show');
+  document.getElementById('login-pin').value = '';
+}
+
+// ===== INIT =====
+async function initApp() {
+  const u = currentUser;
+  const idx = u.name.charCodeAt(0) % 5;
+  document.getElementById('topbar-sub').textContent = u.name+' · '+(u.department||'');
+  document.getElementById('user-avatar').textContent = u.name.substring(0,2);
+  document.getElementById('user-avatar').style.cssText = `background:${AV_BG[idx]};color:${AV_TX[idx]}`;
+  if (u.role === 'hr') document.querySelectorAll('.hr-only').forEach(el => el.style.display = 'block');
+  const { data: cfg } = await db.from('bonus_config').select('*').single();
+  bonusConfig = cfg;
+  const { data: shifts } = await db.from('shifts').select('*').order('shift_name');
+  allShifts = shifts || [];
+  setInterval(updateClock, 1000); updateClock();
+  loadTodayAttendance();
+  loadLeave();
+  loadBonus();
+  document.getElementById('report-date').value = todayStr();
+  document.getElementById('report-month').value = monthStr();
+  document.getElementById('report-bonus-month').value = monthStr();
+}
+
+// ===== CLOCK =====
+function updateClock() {
+  const now = new Date();
+  document.getElementById('live-time').textContent =
+    now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
+  const days=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  document.getElementById('live-date').textContent='วัน'+days[now.getDay()]+' '+now.getDate()+' '+months[now.getMonth()]+' '+(now.getFullYear()+543);
+  if (todayAttendance?.check_in && !todayAttendance?.check_out) {
+    const mins = Math.floor((now - new Date(todayAttendance.check_in))/60000);
+    const h = Math.floor(mins/60), m = mins%60;
+    document.getElementById('today-hrs').textContent = h>0?h+'ชม. '+m+'น.':m+' น.';
+    document.getElementById('today-sub').textContent = 'เริ่ม '+fmtTime(todayAttendance.check_in);
+  }
+}
+
+async function loadTodayAttendance() {
+  const { data } = await db.from('attendance').select('*').eq('employee_id', currentUser.id).eq('work_date', todayStr()).maybeSingle();
+  todayAttendance = data;
+  // Load shift info
+  let shiftInfo = null;
+  if (currentUser.shift_id) {
+    const s = allShifts.find(x => x.id === currentUser.shift_id);
+    shiftInfo = s;
+  }
+  const shiftEl = document.getElementById('live-shift');
+  if (shiftInfo) {
+    shiftEl.textContent = `กะ ${shiftInfo.check_in_time.substring(0,5)}–${shiftInfo.check_out_time.substring(0,5)}${shiftInfo.has_ot?' | OT '+shiftInfo.ot_hours+' ชม.':''}`;
+    if (shiftInfo.has_ot) shiftEl.innerHTML += ' <span class="ot-badge">OT</span>';
+  } else {
+    shiftEl.textContent = 'ยังไม่กำหนดกะ';
+  }
+  updateAttendanceUI();
+  loadMonthCount();
+  renderLogList();
+}
+
+function updateAttendanceUI() {
+  const a = todayAttendance;
+  const dot = document.getElementById('status-dot');
+  const lbl = document.getElementById('status-label');
+  if (!a?.check_in) {
+    dot.className='status-dot'; dot.style.background='#D3D1C7';
+    lbl.textContent='ยังไม่ได้เช็คอิน';
+    document.getElementById('btn-checkin').disabled=false;
+    document.getElementById('btn-checkout').disabled=true;
+  } else if (!a.check_out) {
+    dot.className='status-dot'; dot.style.background='#5DCAA5';
+    // Check if late
+    if (currentUser.shift_id) {
+      const s = allShifts.find(x => x.id === currentUser.shift_id);
+      if (s) {
+        const [sh,sm] = s.check_in_time.split(':').map(Number);
+        const cin = new Date(a.check_in);
+        const diffMin = (cin.getHours()*60+cin.getMinutes())-(sh*60+sm);
+        if (diffMin > 5) lbl.textContent = `⚠️ สาย ${diffMin} นาที · เช็คอิน ${fmtTime(a.check_in)}`;
+        else lbl.textContent = `กำลังทำงาน · เช็คอิน ${fmtTime(a.check_in)}`;
+      }
+    } else { lbl.textContent='กำลังทำงาน · เช็คอิน '+fmtTime(a.check_in); }
+    document.getElementById('btn-checkin').disabled=true;
+    document.getElementById('btn-checkout').disabled=false;
+  } else {
+    dot.className='status-dot out';
+    const mins = Math.floor((new Date(a.check_out)-new Date(a.check_in))/60000);
+    const h=Math.floor(mins/60), m=mins%60;
+    lbl.textContent=`เช็คเอาท์แล้ว · ทำงาน ${h}ชม. ${m}น.`;
+    document.getElementById('btn-checkin').disabled=true;
+    document.getElementById('btn-checkout').disabled=true;
+    document.getElementById('today-hrs').textContent=h+'ชม. '+m+'น.';
+    document.getElementById('today-sub').textContent=fmtTime(a.check_in)+' – '+fmtTime(a.check_out);
+  }
+}
+
+async function loadMonthCount() {
+  const now = new Date();
+  const ms = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const { data } = await db.from('attendance').select('work_date').eq('employee_id', currentUser.id).gte('work_date', ms);
+  document.getElementById('month-days').textContent = (data?.length||0)+' วัน';
+}
+
+function renderLogList() {
+  const el = document.getElementById('log-list');
+  const a = todayAttendance;
+  if (!a?.check_in) { el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:4px 0">ยังไม่มีรายการวันนี้</div>'; return; }
+  let html=`<div class="log-item"><div class="log-icon in">✅</div><div class="log-body"><div class="log-name">เช็คอิน</div><div class="log-sub">บันทึกแล้ว</div></div><div class="log-time">${fmtTime(a.check_in)}</div></div>`;
+  if (a.check_out) html+=`<div class="log-item"><div class="log-icon out">🚪</div><div class="log-body"><div class="log-name">เช็คเอาท์</div><div class="log-sub">บันทึกแล้ว</div></div><div class="log-time">${fmtTime(a.check_out)}</div></div>`;
+  el.innerHTML=html;
+}
+
+async function doCheckin() {
+  document.getElementById('btn-checkin').disabled=true;
+  const { data, error } = await db.from('attendance').insert({ employee_id:currentUser.id, check_in:new Date().toISOString(), work_date:todayStr(), shift_id:currentUser.shift_id||null }).select().single();
+  if (error) { showToast('Error: '+error.message,'#D85A30'); document.getElementById('btn-checkin').disabled=false; return; }
+  todayAttendance=data; updateAttendanceUI(); renderLogList();
+  showToast('✅ เช็คอินสำเร็จ '+fmtTime(new Date()),'#1D9E75');
+}
+async function doCheckout() {
+  document.getElementById('btn-checkout').disabled=true;
+  let otMins=0;
+  if (currentUser.shift_id) {
+    const s = allShifts.find(x => x.id === currentUser.shift_id);
+    if (s?.has_ot) { otMins = Math.round(s.ot_hours*60); }
+  }
+  const { data, error } = await db.from('attendance').update({ check_out:new Date().toISOString(), ot_minutes:otMins }).eq('id', todayAttendance.id).select().single();
+  if (error) { showToast('Error: '+error.message,'#D85A30'); return; }
+  todayAttendance=data; updateAttendanceUI(); renderLogList();
+  showToast('🚪 เช็คเอาท์สำเร็จ '+fmtTime(new Date()),'#534AB7');
+}
+
+// ===== LEAVE =====
+async function loadLeave() {
+  const { data } = await db.from('leave_requests').select('*').eq('employee_id', currentUser.id).order('created_at',{ascending:false});
+  const used={sick:0,personal:0,vacation:0};
+  data?.filter(l=>l.status==='approved').forEach(l=>{ if(used[l.leave_type]!==undefined) used[l.leave_type]+=l.days; });
+  Object.keys(QUOTAS).forEach(t=>{
+    const q=QUOTAS[t],u=used[t]||0,rem=q-u;
+    document.getElementById('q-'+t).textContent=rem;
+    document.getElementById('qf-'+t).style.width=Math.min((u/q)*100,100)+'%';
+    document.getElementById('qu-'+t).textContent='ใช้ '+u+'/'+q+' วัน';
+  });
+  const el=document.getElementById('leave-list');
+  if (!data?.length){el.innerHTML='<div class="loading">ยังไม่มีประวัติการลา</div>';return;}
+  el.innerHTML=data.map(l=>`<div class="leave-card">
+    <div class="leave-head">
+      <span class="leave-type" style="background:${l.leave_type==='sick'?'#FAECE7':l.leave_type==='personal'?'#EEEDFE':'#E1F5EE'};color:${l.leave_type==='sick'?'#712B13':l.leave_type==='personal'?'#3C3489':'#085041'}">${LEAVE_LABELS[l.leave_type]||l.leave_type} · ${l.days} วัน</span>
+      <span class="leave-status status-${l.status}">${l.status==='pending'?'รออนุมัติ':l.status==='approved'?'อนุมัติแล้ว':'ไม่อนุมัติ'}</span>
+    </div>
+    <div class="leave-dates">${fmtDate(l.start_date)} – ${fmtDate(l.end_date)}</div>
+    <div class="leave-reason">${l.reason||''}</div>
+  </div>`).join('');
+}
+function openLeaveForm(){
+  document.getElementById('leave-from').value=todayStr();
+  document.getElementById('leave-to').value=todayStr();
+  document.getElementById('leave-modal').classList.add('show');
+}
+function closeLeaveForm(){document.getElementById('leave-modal').classList.remove('show');}
+async function submitLeave(){
+  const type=document.getElementById('leave-type').value;
+  const from=document.getElementById('leave-from').value;
+  const to=document.getElementById('leave-to').value;
+  const reason=document.getElementById('leave-reason').value;
+  if(!from||!to||!reason){showToast('กรุณากรอกข้อมูลให้ครบ');return;}
+  const days=Math.floor((new Date(to)-new Date(from))/86400000)+1;
+  if(days<1){showToast('วันที่ไม่ถูกต้อง','#D85A30');return;}
+  const{error}=await db.from('leave_requests').insert({employee_id:currentUser.id,leave_type:type,start_date:from,end_date:to,days,reason,status:'pending'});
+  if(error){showToast('Error: '+error.message,'#D85A30');return;}
+  closeLeaveForm(); showToast('📋 ส่งคำขอลาแล้ว รออนุมัติ','#1D9E75'); loadLeave();
+  if(currentUser.role==='hr') loadApprove();
+}
+
+// ===== BONUS =====
+async function loadBonus() {
+  const ym = monthStr();
+  // Get last 12 months bonus records
+  const { data: records } = await db.from('attendance_bonus').select('*').eq('employee_id', currentUser.id).order('year_month', {ascending:false}).limit(12);
+
+  // Calculate current month bonus on the fly
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const monthEnd = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().split('T')[0];
+
+  const { data: atts } = await db.from('attendance').select('*').eq('employee_id', currentUser.id).gte('work_date', monthStart).lte('work_date', monthEnd);
+  const { data: leaves } = await db.from('leave_requests').select('*').eq('employee_id', currentUser.id).eq('status','approved').gte('start_date', monthStart).lte('end_date', monthEnd);
+
+  // Check late days
+  let lateDays=0;
+  const shift = allShifts.find(x=>x.id===currentUser.shift_id);
+  if (shift) {
+    const [sh,sm] = shift.check_in_time.split(':').map(Number);
+    atts?.forEach(a=>{
+      if(a.check_in){
+        const cin=new Date(a.check_in);
+        const diff=(cin.getHours()*60+cin.getMinutes())-(sh*60+sm);
+        if(diff>5) lateDays++;
+      }
+    });
+  }
+  const leaveDays = leaves?.reduce((s,l)=>s+l.days,0)||0;
+  const absentDays = 0; // Would need working days calculation
+  const qualified = lateDays===0 && leaveDays===0;
+
+  // Streak calculation
+  let streak=0;
+  if(records) {
+    for(const r of records){ if(r.is_qualified) streak++; else break; }
+  }
+  if(qualified) streak = (records?.[0]?.year_month!==ym ? streak+1 : streak);
+
+  const totalBonus = (records||[]).filter(r=>r.is_qualified).reduce((s,r)=>s+(r.bonus_amount||0),0);
+  const streakBonus3 = streak>=3?1000:0;
+  const accum12 = (records||[]).slice(0,12).filter(r=>r.is_qualified).reduce((s,r)=>s+(r.bonus_amount||0),0);
+  const streakBonus12 = streak>=12?Math.round(accum12*0.015):0;
+
+  document.getElementById('bonus-total').textContent = '฿'+((totalBonus+streakBonus3+streakBonus12)||0).toLocaleString();
+  document.getElementById('bonus-status').textContent = qualified?'✅ เดือนนี้มีสิทธิ์เบี้ยขยัน':'❌ เดือนนี้ไม่ได้เบี้ยขยัน'+(lateDays>0?' (สาย '+lateDays+' วัน)':leaveDays>0?' (ลา '+leaveDays+' วัน)':'');
+  document.getElementById('b-months').textContent = (records?.filter(r=>r.is_qualified).length||0);
+  document.getElementById('b-streak').textContent = streak;
+  document.getElementById('b-next').textContent = streak<3?'3เดือน':streak<12?'12เดือน':'🎉';
+
+  // Streak dots (show 12)
+  const streakEl = document.getElementById('bonus-streak');
+  let dots='';
+  for(let i=0;i<12;i++){
+    const rec = records?.[11-i];
+    const filled = rec?.is_qualified || (i===11&&qualified);
+    dots+=`<div class="streak-dot${filled?' filled':''}" title="${rec?.year_month||''}">${i+1}</div>`;
+  }
+  streakEl.innerHTML=dots;
+
+  // History
+  const histEl = document.getElementById('bonus-history');
+  if(!records?.length){histEl.innerHTML='<div class="loading">ยังไม่มีประวัติ</div>';return;}
+  histEl.innerHTML=records.map(r=>`<div class="bonus-row">
+    <span class="bonus-month">${thaiMonth(r.year_month)}</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px">${r.is_qualified?'✅':'❌'}</span>
+      <span class="bonus-amt${!r.is_qualified?' zero':''}">${r.is_qualified?'฿'+(r.bonus_amount||500).toLocaleString():'฿0'}</span>
+    </div>
+  </div>`).join('');
+}
+
+// ===== HR REPORT =====
+let currentReportType = 'daily';
+function switchReport(type) {
+  currentReportType = type;
+  ['daily','monthly','bonus'].forEach(t=>{
+    document.getElementById('rt-'+t).classList.toggle('active',t===type);
+    document.getElementById('report-filter-'+t).style.display=t===type?'flex':'none';
+  });
+  if(type==='daily') loadReport();
+  else if(type==='monthly') loadMonthlyReport();
+  else loadBonusReport();
+}
+
+async function loadReport() {
+  const date = document.getElementById('report-date').value || todayStr();
+  const { data:emps } = await db.from('employees').select('*').order('name');
+  const { data:atts } = await db.from('attendance').select('*').eq('work_date', date);
+  const { data:leaves } = await db.from('leave_requests').select('*').eq('status','approved').lte('start_date',date).gte('end_date',date);
+  let present=0,late=0,onleave=0;
+  const el = document.getElementById('report-content');
+  if(!emps){el.innerHTML='<div class="loading">ไม่พบข้อมูล</div>';return;}
+  const rows = emps.map((e,i)=>{
+    const a=atts?.find(x=>x.employee_id===e.id);
+    const l=leaves?.find(x=>x.employee_id===e.id);
+    const shift=allShifts.find(x=>x.id===e.shift_id);
+    let badge='',badgeCls='status-rejected',info='ยังไม่มา';
+    if(l){onleave++;badge=LEAVE_LABELS[l.leave_type]||'ลา';badgeCls='status-pending';info='ลางาน';}
+    else if(a?.check_in){
+      present++;
+      let lateMin=0;
+      if(shift){const[sh,sm]=shift.check_in_time.split(':').map(Number);const cin=new Date(a.check_in);lateMin=(cin.getHours()*60+cin.getMinutes())-(sh*60+sm);}
+      if(lateMin>5){late++;badge='สาย '+lateMin+'น.';badgeCls='status-pending';}
+      else{badge='มาปกติ';badgeCls='status-approved';}
+      info=(a.check_in?'เข้า '+fmtTime(a.check_in):'')+( a.check_out?' – ออก '+fmtTime(a.check_out):'');
+      if(shift?.has_ot) info+=' <span class="ot-badge">OT</span>';
+    }
+    const idx=i%5;
+    return `<div class="emp-row">
+      <div class="emp-avatar" style="background:${AV_BG[idx]};color:${AV_TX[idx]}">${e.name.substring(0,2)}</div>
+      <div class="emp-info"><div class="emp-name">${e.name}</div><div class="emp-dept">${info}</div></div>
+      <span class="emp-badge ${badgeCls}">${badge||'ยังไม่มา'}</span>
+    </div>`;
+  });
+  el.innerHTML=`<div class="summary-grid">
+    <div class="sum-box"><div class="sum-val" style="color:var(--teal-dark)">${present}</div><div class="sum-label">มาทำงาน</div></div>
+    <div class="sum-box"><div class="sum-val" style="color:var(--amber-dark)">${late}</div><div class="sum-label">สาย</div></div>
+    <div class="sum-box"><div class="sum-val" style="color:var(--purple)">${onleave}</div><div class="sum-label">ลางาน</div></div>
+    <div class="sum-box"><div class="sum-val" style="color:var(--coral)">${emps.length-present-onleave}</div><div class="sum-label">ขาด</div></div>
+  </div>`+rows.join('');
+}
+
+async function loadMonthlyReport() {
+  const ym = document.getElementById('report-month').value || monthStr();
+  const [y,m] = ym.split('-');
+  const start = `${y}-${m}-01`;
+  const end = new Date(y, m, 0).toISOString().split('T')[0];
+  const { data:emps } = await db.from('employees').select('*').order('name');
+  const { data:atts } = await db.from('attendance').select('*').gte('work_date',start).lte('work_date',end);
+  const { data:leaves } = await db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end);
+  const el = document.getElementById('report-content');
+  if(!emps){el.innerHTML='<div class="loading">ไม่พบข้อมูล</div>';return;}
+  const rows = emps.map((e,i)=>{
+    const eAtts = atts?.filter(a=>a.employee_id===e.id)||[];
+    const eLeaves = leaves?.filter(l=>l.employee_id===e.id)||[];
+    const shift = allShifts.find(x=>x.id===e.shift_id);
+    let lateDays=0;
+    eAtts.forEach(a=>{
+      if(a.check_in&&shift){
+        const[sh,sm]=shift.check_in_time.split(':').map(Number);
+        const cin=new Date(a.check_in);
+        if((cin.getHours()*60+cin.getMinutes())-(sh*60+sm)>5) lateDays++;
+      }
+    });
+    const leaveDays=eLeaves.reduce((s,l)=>s+l.days,0);
+    const otHours=eAtts.reduce((s,a)=>s+(a.ot_minutes||0)/60,0);
+    const qualified=lateDays===0&&leaveDays===0;
+    const idx=i%5;
+    return `<div class="emp-row">
+      <div class="emp-avatar" style="background:${AV_BG[idx]};color:${AV_TX[idx]}">${e.name.substring(0,2)}</div>
+      <div class="emp-info">
+        <div class="emp-name">${e.name}</div>
+        <div class="emp-dept">มา ${eAtts.length} วัน · สาย ${lateDays} วัน · ลา ${leaveDays} วัน${otHours>0?' · OT '+otHours.toFixed(1)+'ชม.':''}</div>
+      </div>
+      <span class="emp-badge ${qualified?'status-approved':'status-rejected'}">${qualified?'✅ ได้เบี้ย':'❌ ไม่ได้'}</span>
+    </div>`;
+  });
+  el.innerHTML=`<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">สรุป ${thaiMonth(ym)}</div>`+rows.join('');
+}
+
+async function loadBonusReport() {
+  const ym = document.getElementById('report-bonus-month').value || monthStr();
+  const { data:emps } = await db.from('employees').select('*').order('name');
+  const { data:records } = await db.from('attendance_bonus').select('*').eq('year_month',ym);
+  const el = document.getElementById('report-content');
+  let total=0,qualified=0;
+  const rows=(emps||[]).map((e,i)=>{
+    const r=records?.find(x=>x.employee_id===e.id);
+    const amt=r?.is_qualified?(r.bonus_amount||500):0;
+    total+=amt; if(amt>0) qualified++;
+    const idx=i%5;
+    return `<div class="emp-row">
+      <div class="emp-avatar" style="background:${AV_BG[idx]};color:${AV_TX[idx]}">${e.name.substring(0,2)}</div>
+      <div class="emp-info"><div class="emp-name">${e.name}</div><div class="emp-dept">${e.department||''} · สะสม ${r?.accumulated_months||0} เดือน</div></div>
+      <span class="emp-badge ${amt>0?'status-approved':'status-rejected'}">${amt>0?'฿'+amt.toLocaleString():'฿0'}</span>
+    </div>`;
+  });
+  el.innerHTML=`<div class="summary-grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="sum-box"><div class="sum-val" style="color:var(--teal-dark)">${qualified}</div><div class="sum-label">ได้เบี้ย</div></div>
+    <div class="sum-box"><div class="sum-val" style="color:var(--coral)">${(emps?.length||0)-qualified}</div><div class="sum-label">ไม่ได้</div></div>
+    <div class="sum-box"><div class="sum-val" style="color:var(--purple);font-size:14px">฿${total.toLocaleString()}</div><div class="sum-label">รวมจ่าย</div></div>
+  </div>`+rows.join('');
+}
+
+// ===== APPROVE =====
+async function loadApprove() {
+  const { data } = await db.from('leave_requests').select('*, employees(name,department)').eq('status','pending').order('created_at');
+  const tab = document.getElementById('approve-tab');
+  if(tab) tab.textContent='✅ อนุมัติ'+(data?.length?' ('+data.length+')':'');
+  const el=document.getElementById('approve-list');
+  if(!data?.length){el.innerHTML='<div class="loading">ไม่มีคำขอที่รออนุมัติ</div>';return;}
+  el.innerHTML=data.map(l=>`<div class="leave-card" onclick="openApproveModal('${l.id}')">
+    <div class="leave-head">
+      <span style="font-size:13px;font-weight:600">${l.employees?.name}</span>
+      <span class="leave-type" style="background:#FAEEDA;color:#633806;font-size:10px">${LEAVE_LABELS[l.leave_type]}</span>
+    </div>
+    <div class="leave-dates">${fmtDate(l.start_date)} – ${fmtDate(l.end_date)} · ${l.days} วัน</div>
+    <div class="leave-reason">${l.reason}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px">
+      <button class="btn-reject" onclick="event.stopPropagation();quickDecide('${l.id}','rejected')">❌ ไม่อนุมัติ</button>
+      <button class="btn-approve" onclick="event.stopPropagation();quickDecide('${l.id}','approved')">✅ อนุมัติ</button>
+    </div>
+  </div>`).join('');
+}
+function openApproveModal(id){
+  selectedLeaveId=id;
+  db.from('leave_requests').select('*, employees(name,department)').eq('id',id).single().then(({data:l})=>{
+    if(!l) return;
+    document.getElementById('approve-detail').innerHTML=`
+      <div class="detail-row"><span class="detail-label">พนักงาน</span><span>${l.employees?.name}</span></div>
+      <div class="detail-row"><span class="detail-label">แผนก</span><span>${l.employees?.department||'-'}</span></div>
+      <div class="detail-row"><span class="detail-label">ประเภทลา</span><span>${LEAVE_LABELS[l.leave_type]}</span></div>
+      <div class="detail-row"><span class="detail-label">วันที่</span><span>${fmtDate(l.start_date)} – ${fmtDate(l.end_date)}</span></div>
+      <div class="detail-row"><span class="detail-label">จำนวน</span><span>${l.days} วัน</span></div>
+      <div class="detail-row"><span class="detail-label">เหตุผล</span><span>${l.reason}</span></div>`;
+    document.getElementById('approve-note').value='';
+    document.getElementById('approve-modal').classList.add('show');
+  });
+}
+function closeApproveModal(){document.getElementById('approve-modal').classList.remove('show');selectedLeaveId=null;}
+async function quickDecide(id, status){
+  await db.from('leave_requests').update({status,approved_by:currentUser.id}).eq('id',id);
+  showToast(status==='approved'?'✅ อนุมัติแล้ว':'❌ ไม่อนุมัติ',status==='approved'?'#1D9E75':'#D85A30');
+  loadApprove();
+}
+async function decideLeave(status){
+  if(!selectedLeaveId) return;
+  const note=document.getElementById('approve-note').value;
+  await db.from('leave_requests').update({status,approved_by:currentUser.id,note}).eq('id',selectedLeaveId);
+  closeApproveModal();
+  showToast(status==='approved'?'✅ อนุมัติแล้ว':'❌ ไม่อนุมัติ',status==='approved'?'#1D9E75':'#D85A30');
+  loadApprove();
+}
+
+// ===== EMPLOYEES =====
+async function loadEmpPage() {
+  const { data } = await db.from('employees').select('*').order('name');
+  allEmployees = data||[];
+  document.getElementById('emp-count').textContent = allEmployees.length;
+  const el=document.getElementById('emp-list-page');
+  if(!allEmployees.length){el.innerHTML='<div class="loading">ยังไม่มีพนักงาน</div>';return;}
+  el.innerHTML=allEmployees.map((e,i)=>{
+    const shift=allShifts.find(x=>x.id===e.shift_id);
+    const idx=i%5;
+    return `<div class="emp-manage-row" onclick="openEmpForm('${e.id}')">
+      <div class="emp-avatar" style="background:${AV_BG[idx]};color:${AV_TX[idx]}">${e.name.substring(0,2)}</div>
+      <div class="emp-info">
+        <div class="emp-name">${e.name}</div>
+        <div class="emp-dept">${e.department||'ไม่ระบุ'} · ${shift?shift.shift_name:'ยังไม่กำหนดกะ'}</div>
+      </div>
+      <span class="emp-badge ${e.role==='hr'?'status-approved':'status-pending'}">${e.role==='hr'?'HR':'พนักงาน'}</span>
+    </div>`;
+  }).join('');
+}
+function openEmpForm(empId) {
+  const sel=document.getElementById('emp-shift');
+  sel.innerHTML='<option value="">-- เลือกกะ --</option>';
+  allShifts.forEach(s=>{
+    const o=document.createElement('option');
+    o.value=s.id; o.textContent=s.shift_name+(s.has_ot?' (OT '+s.ot_hours+'ชม.)':'');
+    sel.appendChild(o);
+  });
+  if(empId){
+    const e=allEmployees.find(x=>x.id===empId);
+    if(!e) return;
+    document.getElementById('emp-modal-title').textContent='แก้ไขพนักงาน';
+    document.getElementById('emp-id').value=e.id;
+    document.getElementById('emp-name').value=e.name||'';
+    document.getElementById('emp-dept').value=e.department||'';
+    document.getElementById('emp-email').value=e.email||'';
+    document.getElementById('emp-pin').value=e.pin||'';
+    document.getElementById('emp-shift').value=e.shift_id||'';
+    document.getElementById('emp-role').value=e.role||'employee';
+    document.getElementById('btn-delete-emp').style.display='block';
+  } else {
+    document.getElementById('emp-modal-title').textContent='เพิ่มพนักงานใหม่';
+    ['emp-id','emp-name','emp-dept','emp-email','emp-pin'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('emp-shift').value='';
+    document.getElementById('emp-role').value='employee';
+    document.getElementById('btn-delete-emp').style.display='none';
+  }
+  document.getElementById('emp-modal').classList.add('show');
+}
+function closeEmpForm(){document.getElementById('emp-modal').classList.remove('show');}
+async function saveEmployee(){
+  const id=document.getElementById('emp-id').value;
+  const name=document.getElementById('emp-name').value.trim();
+  const dept=document.getElementById('emp-dept').value.trim();
+  const email=document.getElementById('emp-email').value.trim();
+  const pin=document.getElementById('emp-pin').value.trim();
+  const shift_id=document.getElementById('emp-shift').value||null;
+  const role=document.getElementById('emp-role').value;
+  if(!name||!email||!pin){showToast('กรุณากรอกชื่อ Email และ PIN','#D85A30');return;}
+  if(pin.length!==4||isNaN(pin)){showToast('PIN ต้องเป็นตัวเลข 4 หลัก','#D85A30');return;}
+  let error;
+  if(id){({error}=await db.from('employees').update({name,department:dept,email,pin,shift_id,role}).eq('id',id));}
+  else{({error}=await db.from('employees').insert({name,department:dept,email,pin,shift_id,role}));}
+  if(error){showToast('Error: '+(error.message.includes('unique')?'Email นี้มีอยู่แล้ว':error.message),'#D85A30');return;}
+  closeEmpForm(); showToast(id?'✅ แก้ไขแล้ว':'✅ เพิ่มพนักงานแล้ว','#1D9E75');
+  loadEmpPage(); loadEmployeeList();
+}
+async function deleteEmployee(){
+  const id=document.getElementById('emp-id').value;
+  const name=document.getElementById('emp-name').value;
+  if(!confirm('ลบ "'+name+'" ออกจากระบบ?\nข้อมูลการลงเวลาจะยังคงอยู่')) return;
+  const{error}=await db.from('employees').delete().eq('id',id);
+  if(error){showToast('ลบไม่ได้: '+error.message,'#D85A30');return;}
+  closeEmpForm(); showToast('ลบพนักงานแล้ว','#D85A30'); loadEmpPage(); loadEmployeeList();
+}
+
+// ===== PAGE NAV =====
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  const tabs=['clock','leave','bonus','report','approve','employees'];
+  const tabEls=document.querySelectorAll('.tab');
+  const idx=tabs.indexOf(name);
+  if(tabEls[idx]) tabEls[idx].classList.add('active');
+  if(name==='report') loadReport();
+  if(name==='approve') loadApprove();
+  if(name==='employees') loadEmpPage();
+  if(name==='bonus') loadBonus();
+}
+
+loadEmployeeList();
+</script>
+</body>
+</html>
