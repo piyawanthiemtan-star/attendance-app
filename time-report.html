@@ -77,14 +77,14 @@ tr:hover td{background:#F8FFFE}
 
 <div class="header">
   <div style="display:flex;align-items:center;gap:12px">
-    <a href="attendance-app.html" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;text-decoration:none;flex-shrink:0" title="กลับหน้าหลัก">←</a>
+    <a href="javascript:history.back()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;text-decoration:none;flex-shrink:0" title="กลับหน้าหลัก">←</a>
     <div>
       <h1>📊 รายงานเวลาทำงาน</h1>
       <p id="report-period">กำลังโหลด...</p>
     </div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <a href="attendance-app.html" class="btn" style="background:rgba(255,255,255,0.2);color:#fff;text-decoration:none">🏠 หน้าหลัก</a>
+    <a href="javascript:history.back()" class="btn" style="background:rgba(255,255,255,0.2);color:#fff;text-decoration:none">← กลับ</a>
     <button class="btn btn-export" onclick="exportExcel()" id="btn-export" disabled>
       📥 Export Excel
     </button>
@@ -366,16 +366,10 @@ function exportExcel(){
   const{label}=getDateRange();
   const wb=XLSX.utils.book_new();
 
-  // Sheet 1: Raw data ทุกคน
-  const ws=XLSX.utils.json_to_sheet(reportData);
-  // Column widths
-  ws['!cols']=[{wch:16},{wch:10},{wch:14},{wch:10},{wch:6},{wch:8},{wch:8},{wch:10},{wch:8},{wch:8},{wch:8},{wch:12}];
-  XLSX.utils.book_append_sheet(wb,ws,'ข้อมูลเวลาทำงาน');
-
-  // Sheet 2: สรุปรายคน
+  // Sheet 1: สรุปทุกคน
   const summary=[];
-  const empIds=[...new Set(reportData.map(r=>r.ชื่อ))];
-  empIds.forEach(name=>{
+  const empNames=[...new Set(reportData.map(r=>r.ชื่อ))];
+  empNames.forEach(name=>{
     const rows=reportData.filter(r=>r.ชื่อ===name);
     const workDays=rows.filter(r=>r.สถานะ==='ปกติ'||r.สถานะ==='สาย').length;
     const lateDays=rows.filter(r=>r.สถานะ==='สาย').length;
@@ -383,11 +377,72 @@ function exportExcel(){
     const absentDays=rows.filter(r=>r.สถานะ==='ขาด').length;
     const leaveDays=rows.filter(r=>r.สถานะ==='ลา').length;
     const otHrs=rows.reduce((s,r)=>s+parseFloat(r.OT_ชม||0),0);
-    summary.push({ชื่อ:name,แผนก:rows[0]?.แผนก,สาขา:rows[0]?.สาขา,มาทำงาน:workDays,สาย_ครั้ง:lateDays,สาย_นาทีรวม:lateMin,ขาด:absentDays,ลา:leaveDays,OT_ชม:otHrs.toFixed(1),เบี้ยขยัน:lateDays===0&&absentDays===0&&leaveDays===0?'✅ ได้':'❌ ไม่ได้'});
+    const qualified=lateDays===0&&absentDays===0&&leaveDays===0;
+    summary.push({
+      ชื่อ:name,
+      แผนก:rows[0]?.แผนก||'',
+      สาขา:rows[0]?.สาขา||'',
+      มาทำงาน_วัน:workDays,
+      สาย_ครั้ง:lateDays,
+      สาย_นาทีรวม:lateMin,
+      ขาด_วัน:absentDays,
+      ลา_วัน:leaveDays,
+      OT_ชม:otHrs.toFixed(1),
+      เบี้ยขยัน:qualified?'ได้':'ไม่ได้'
+    });
   });
-  const ws2=XLSX.utils.json_to_sheet(summary);
-  ws2['!cols']=[{wch:16},{wch:10},{wch:14},{wch:10},{wch:8},{wch:12},{wch:8},{wch:8},{wch:8},{wch:10}];
-  XLSX.utils.book_append_sheet(wb,ws2,'สรุปรายบุคคล');
+  const wsSummary=XLSX.utils.json_to_sheet(summary);
+  wsSummary['!cols']=[{wch:18},{wch:12},{wch:16},{wch:12},{wch:10},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10}];
+  // Style header row
+  XLSX.utils.book_append_sheet(wb,wsSummary,'สรุปทุกคน');
+
+  // Sheet ละคน
+  empNames.forEach(name=>{
+    const rows=reportData.filter(r=>r.ชื่อ===name);
+    if(!rows.length) return;
+
+    // Personal data rows
+    const sheetData=rows.map(r=>({
+      วันที่:r.วันที่,
+      วัน:r.วัน,
+      เวลาเข้า:r.เวลาเข้า,
+      เวลาออก:r.เวลาออก,
+      รวมชั่วโมง:r.รวมชั่วโมง,
+      สาย_นาที:r.สาย_นาที||'',
+      OT_ชม:r.OT_ชม||'',
+      สถานะ:r.สถานะ,
+      หมายเหตุ:r.หมายเหตุ||''
+    }));
+
+    // Add summary row at bottom
+    const workDays=rows.filter(r=>r.สถานะ==='ปกติ'||r.สถานะ==='สาย').length;
+    const lateDays=rows.filter(r=>r.สถานะ==='สาย').length;
+    const lateMin=rows.reduce((s,r)=>s+(r.สาย_นาที||0),0);
+    const absentDays=rows.filter(r=>r.สถานะ==='ขาด').length;
+    const leaveDays=rows.filter(r=>r.สถานะ==='ลา').length;
+    const otHrs=rows.reduce((s,r)=>s+parseFloat(r.OT_ชม||0),0);
+    const qualified=lateDays===0&&absentDays===0&&leaveDays===0;
+
+    sheetData.push({});  // empty row
+    sheetData.push({
+      วันที่:'สรุป',
+      วัน:'',
+      เวลาเข้า:'มาทำงาน: '+workDays+' วัน',
+      เวลาออก:'สาย: '+lateDays+' ครั้ง ('+lateMin+' นาที)',
+      รวมชั่วโมง:'ขาด: '+absentDays+' วัน',
+      สาย_นาที:'ลา: '+leaveDays+' วัน',
+      OT_ชม:'OT: '+otHrs.toFixed(1)+' ชม.',
+      สถานะ:'เบี้ยขยัน: '+(qualified?'✅ ได้':'❌ ไม่ได้'),
+      หมายเหตุ:''
+    });
+
+    const ws=XLSX.utils.json_to_sheet(sheetData);
+    ws['!cols']=[{wch:12},{wch:6},{wch:10},{wch:10},{wch:12},{wch:10},{wch:10},{wch:10},{wch:14}];
+
+    // ชื่อ Sheet ตัดให้ไม่เกิน 31 ตัวอักษร (Excel limit)
+    const sheetName=name.substring(0,31);
+    XLSX.utils.book_append_sheet(wb,ws,sheetName);
+  });
 
   XLSX.writeFile(wb,`รายงานเวลา_${label.replace(/ /g,'_')}.xlsx`);
 }
