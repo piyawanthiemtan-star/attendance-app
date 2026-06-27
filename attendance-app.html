@@ -453,6 +453,54 @@ input,select,textarea,button{font-family:inherit;font-size:14px}
         <div class="card" id="admin-today-summary"><div class="loading-text">กำลังโหลด...</div></div>
       </div>
     </div>
+
+    <!-- PROFILE PAGE -->
+    <div class="page" id="page-profile">
+      <div style="text-align:center;padding:24px 0 16px">
+        <div id="profile-avatar" style="width:72px;height:72px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin-bottom:12px"></div>
+        <div style="font-size:18px;font-weight:700" id="profile-name">--</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:4px" id="profile-info">--</div>
+        <div id="profile-role-badge" style="display:inline-block;margin-top:8px;font-size:12px;padding:4px 14px;border-radius:20px;font-weight:600"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">ข้อมูลการทำงาน</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:var(--gray);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--teal)" id="p-days">0</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">วันที่มาทำงาน</div>
+          </div>
+          <div style="background:var(--gray);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--orange)" id="p-late">0</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">ครั้งที่สาย</div>
+          </div>
+          <div style="background:var(--gray);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--blue)" id="p-leave">0</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">วันลาปีนี้</div>
+          </div>
+          <div style="background:var(--gray);border-radius:10px;padding:12px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--green)" id="p-bonus">฿0</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">เบี้ยขยันสะสม</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔐 เปลี่ยน PIN</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:12px">PIN ใช้สำหรับล็อกอินเข้าระบบ ควรเก็บไว้เป็นความลับ</div>
+        <label class="modal-label" style="margin-top:0">PIN ปัจจุบัน</label>
+        <input class="modal-input" type="password" id="pin-old" maxlength="4" placeholder="••••" inputmode="numeric" style="margin-bottom:10px">
+        <label class="modal-label">PIN ใหม่ (4 หลัก)</label>
+        <input class="modal-input" type="password" id="pin-new" maxlength="4" placeholder="••••" inputmode="numeric" style="margin-bottom:10px">
+        <label class="modal-label">ยืนยัน PIN ใหม่</label>
+        <input class="modal-input" type="password" id="pin-confirm" maxlength="4" placeholder="••••" inputmode="numeric" style="margin-bottom:14px">
+        <button class="btn-checkin-big" onclick="changePin()" style="font-size:14px;padding:13px">🔐 เปลี่ยน PIN</button>
+      </div>
+
+      <button style="width:100%;padding:13px;border-radius:10px;border:1.5px solid var(--border);background:var(--white);color:var(--red);font-size:14px;font-weight:600;cursor:pointer;margin-top:8px" onclick="doLogout()">
+        🚪 ออกจากระบบ
+      </button>
+    </div>
   </div>
 
   <!-- BOTTOM NAV -->
@@ -463,6 +511,7 @@ input,select,textarea,button{font-family:inherit;font-size:14px}
     <button class="nav-item" id="nav-report" onclick="showPage('report')"><div class="nav-icon">📊</div>รายงาน</button>
     <button class="nav-item hr-nav" id="nav-admin" onclick="showPage('admin')" style="display:none"><div class="nav-icon">⚙️</div>Admin</button>
     <button class="nav-item" id="nav-bonus" onclick="showPage('bonus')"><div class="nav-icon">💰</div>เบี้ยขยัน</button>
+    <button class="nav-item" id="nav-profile" onclick="showPage('profile')"><div class="nav-icon">👤</div>โปรไฟล์</button>
   </div>
 </div>
 
