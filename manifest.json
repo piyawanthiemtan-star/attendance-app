@@ -1,0 +1,25 @@
+{
+  "name": "LOEI SMART GROUP - Time Attendance",
+  "short_name": "LSG Attendance",
+  "description": "ระบบลงเวลาพนักงาน เลยสมาร์ท กรุ๊ป",
+  "start_url": "./attendance-app.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#00796b",
+  "theme_color": "#00796b",
+  "lang": "th",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
