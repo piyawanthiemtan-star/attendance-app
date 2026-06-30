@@ -13,6 +13,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>LOEI SMART GROUP - Time Attendance</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -334,6 +335,10 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
           <div class="menu-icon" style="background:#FCE4EC">📊</div>
           <div><div class="menu-label">รายงาน</div><div class="menu-sub">ประวัติลงเวลา</div></div>
         </button>
+        <button class="menu-item" onclick="openMyPayslip()">
+          <div class="menu-icon" style="background:#E8F5E9"><img src="icon-512-payroll.png" style="width:28px;height:28px;border-radius:6px"></div>
+          <div><div class="menu-label">เงินเดือน</div><div class="menu-sub">ดูสลิปของฉัน</div></div>
+        </button>
         <button class="menu-item" onclick="showPage('announce')" style="grid-column:span 2">
           <div class="menu-icon" style="background:#EDE7F6">📢</div>
           <div><div class="menu-label">ประกาศ / ข่าวสาร</div><div class="menu-sub">ข้อมูลจาก HR รายเดือน</div></div>
@@ -378,6 +383,10 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         <div class="card-title">📝 บันทึกวันนี้</div>
         <div id="clock-log"><div class="loading-text">กำลังโหลด...</div></div>
       </div>
+
+      <button onclick="openMyPayslip()" style="width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#0B9E82,#0D7A65);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
+        💵 ดูสลิปเงินเดือนของฉัน
+      </button>
     </div>
 
     <!-- LEAVE -->
@@ -496,6 +505,21 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
           <div class="admin-item-info"><div class="admin-item-label">รายงานเวลาทำงาน</div><div class="admin-item-sub">ดูและ Export Excel รายบุคคล</div></div>
           <div class="admin-item-arrow">›</div>
         </a>
+        <a class="admin-item" href="payroll.html" style="text-decoration:none;color:inherit">
+          <div class="admin-item-icon" style="background:#E8F5E9">💵</div>
+          <div class="admin-item-info"><div class="admin-item-label">ระบบเงินเดือน</div><div class="admin-item-sub">คำนวณ สลิป รอบจ่าย เบิกล่วงหน้า</div></div>
+          <div class="admin-item-arrow">›</div>
+        </a>
+        <button class="admin-item" onclick="openModal('modal-shift')">
+          <div class="admin-item-icon" style="background:#F3E5F5">⏰</div>
+          <div class="admin-item-info"><div class="admin-item-label">จัดการกะงาน</div><div class="admin-item-sub">เพิ่ม แก้ไข ลบกะการทำงาน</div></div>
+          <div class="admin-item-arrow">›</div>
+        </button>
+        <button class="admin-item" onclick="openImportModal()">
+          <div class="admin-item-icon" style="background:#E8EAF6">📤</div>
+          <div class="admin-item-info"><div class="admin-item-label">นำเข้าข้อมูล Excel</div><div class="admin-item-sub">Import Template LSMG รายเดือน</div></div>
+          <div class="admin-item-arrow">›</div>
+        </button>
       </div>
 
       <div class="admin-section">
@@ -541,6 +565,10 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         </div>
       </div>
 
+      <button onclick="openMyPayslip()" style="width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#0B9E82,#0D7A65);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px">
+        💵 ดูสลิปเงินเดือนของฉัน
+      </button>
+
       <div class="card">
         <div class="card-title">🔐 เปลี่ยน PIN</div>
         <div style="font-size:12px;color:var(--text3);margin-bottom:12px">PIN ใช้สำหรับล็อกอินเข้าระบบ ควรเก็บไว้เป็นความลับ</div>
@@ -556,6 +584,21 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <button style="width:100%;padding:13px;border-radius:10px;border:1.5px solid var(--border);background:var(--white);color:var(--red);font-size:14px;font-weight:600;cursor:pointer;margin-top:8px" onclick="doLogout()">
         🚪 ออกจากระบบ
       </button>
+    </div>
+  </div>
+
+  <!-- MODAL: สลิปเงินเดือนตัวเอง -->
+  <div class="modal-overlay" id="modal-my-payslip">
+    <div class="modal-box">
+      <div class="modal-handle"></div>
+      <div class="modal-title">💵 สลิปเงินเดือน
+        <button class="modal-close" onclick="closeModal('modal-my-payslip')">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+        <input type="month" class="modal-input" id="ps-month" style="flex:1">
+        <button onclick="loadMyPayslip()" style="padding:10px 16px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-weight:700;cursor:pointer">ดู</button>
+      </div>
+      <div id="my-payslip-content"><div style="text-align:center;padding:20px;color:var(--text3)">เลือกเดือนแล้วกด "ดู"</div></div>
     </div>
   </div>
 
@@ -777,6 +820,82 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
     <button class="btn-primary" onclick="confirmShiftAndCheckin()" id="btn-confirm-shift" disabled style="margin-top:20px">✅ ยืนยันและเช็คอิน</button>
   </div>
 </div>
+<!-- SHIFT MODAL -->
+<div class="modal-overlay" id="modal-shift">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">⏰ จัดการกะงาน <button class="modal-close" onclick="closeModal('modal-shift')">✕</button></div>
+    <div id="shift-list-admin"><div class="loading-text">กำลังโหลด...</div></div>
+    <button class="btn-primary" onclick="openShiftForm(null)" style="margin-top:8px">+ เพิ่มกะงานใหม่</button>
+  </div>
+</div>
+
+<!-- SHIFT FORM MODAL -->
+<div class="modal-overlay" id="modal-shift-form">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title"><span id="sf-title">เพิ่มกะงาน</span> <button class="modal-close" onclick="closeModal('modal-shift-form')">✕</button></div>
+    <input type="hidden" id="sf-id">
+    <label class="modal-label">ชื่อกะ *</label>
+    <input class="modal-input" id="sf-name" placeholder="เช่น กะ 08:00-18:00">
+    <label class="modal-label">เวลาเข้างาน * (HH:MM)</label>
+    <input class="modal-input" id="sf-cin" placeholder="08:00" maxlength="5" inputmode="numeric">
+    <label class="modal-label">เวลาออกงาน * (HH:MM)</label>
+    <input class="modal-input" id="sf-cout" placeholder="18:00" maxlength="5" inputmode="numeric">
+    <label class="modal-label" style="display:flex;align-items:center;gap:8px">
+      <input type="checkbox" id="sf-ot" style="width:18px;height:18px;accent-color:var(--teal)">
+      <span>กะนี้มี OT (ทำงานล่วงเวลา)</span>
+    </label>
+    <button class="btn-primary" onclick="saveShift()" style="margin-top:12px">💾 บันทึก</button>
+    <button class="btn-secondary" id="sf-delete" onclick="deleteShift()" style="display:none;margin-top:8px">🗑 ลบกะนี้</button>
+  </div>
+</div>
+
+<!-- IMPORT EXCEL MODAL -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal-box" style="max-height:90vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📤 นำเข้าข้อมูล Excel <button class="modal-close" onclick="closeModal('modal-import')">✕</button></div>
+
+    <div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#1565C0">
+      <div style="font-weight:700;margin-bottom:4px">📋 วิธีใช้งาน</div>
+      <div>1. เลือกไฟล์ Excel Template ของ LSMG (LSMG_Template_Import_XX_2026.xlsx)</div>
+      <div>2. ระบบจะอ่าน Sheet "ลงเวลา" และ "วันลา" อัตโนมัติ</div>
+      <div>3. ตรวจสอบข้อมูลตัวอย่าง แล้วกด "นำเข้าเลย"</div>
+    </div>
+
+    <label class="modal-label">เลือกไฟล์ Excel *</label>
+    <div style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;margin-bottom:12px" onclick="document.getElementById('import-file-input').click()">
+      <div style="font-size:28px">📂</div>
+      <div id="import-file-name" style="font-size:13px;color:var(--text3);margin-top:6px">แตะเพื่อเลือกไฟล์ .xlsx</div>
+      <input type="file" id="import-file-input" accept=".xlsx,.xls" style="display:none" onchange="previewImport(this)">
+    </div>
+
+    <div id="import-preview" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div style="background:var(--gray);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:20px;font-weight:800;color:var(--teal)" id="imp-att-count">0</div>
+          <div style="font-size:11px;color:var(--text3)">รายการลงเวลา</div>
+        </div>
+        <div style="background:var(--gray);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:20px;font-weight:800;color:var(--blue)" id="imp-leave-count">0</div>
+          <div style="font-size:11px;color:var(--text3)">รายการวันลา</div>
+        </div>
+      </div>
+      <div id="import-warn" style="display:none;background:#FFF8E1;border:1px solid #F9A825;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:#E65100"></div>
+      <div id="import-preview-table" style="font-size:11px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:12px"></div>
+      <button class="btn-primary" id="btn-do-import" onclick="doImport()" style="background:var(--teal)">📤 นำเข้าเลย</button>
+    </div>
+
+    <div id="import-result" style="display:none;text-align:center;padding:20px">
+      <div style="font-size:40px" id="import-result-icon">✅</div>
+      <div style="font-size:16px;font-weight:700;margin-top:8px" id="import-result-title"></div>
+      <div style="font-size:13px;color:var(--text3);margin-top:4px" id="import-result-sub"></div>
+      <button class="btn-primary" onclick="resetImport()" style="margin-top:16px">นำเข้าไฟล์ใหม่</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2065,6 +2184,339 @@ async function deleteLeave(id){
 }
 
 initLogin();
+
+// ==================== SHIFT MANAGEMENT ====================
+
+async function loadShiftList(){
+  const{data}=await db.from('shifts').select('*').order('check_in_time');
+  allShifts=data||[];
+  const el=document.getElementById('shift-list-admin');
+  if(!allShifts.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">ยังไม่มีกะงาน</div>';return;}
+  el.innerHTML=allShifts.map(s=>`
+    <div class="emp-report-row" onclick="openShiftForm('${s.id}')" style="cursor:pointer">
+      <div class="emp-av" style="background:#F3E5F5;color:#4A148C;font-size:18px">⏰</div>
+      <div class="emp-ri">
+        <div class="emp-rname">${s.shift_name}</div>
+        <div class="emp-rsub">${s.check_in_time.substring(0,5)} – ${s.check_out_time.substring(0,5)}${s.has_ot?' · มี OT':''}</div>
+      </div>
+      <span class="emp-rbadge ${s.has_ot?'badge-ok':'badge-leave'}">${s.has_ot?'OT':'ปกติ'}</span>
+    </div>`).join('');
+}
+
+function openShiftForm(id){
+  if(id){
+    const s=allShifts.find(x=>x.id===id);if(!s)return;
+    document.getElementById('sf-title').textContent='แก้ไขกะงาน';
+    document.getElementById('sf-id').value=s.id;
+    document.getElementById('sf-name').value=s.shift_name||'';
+    document.getElementById('sf-cin').value=s.check_in_time.substring(0,5);
+    document.getElementById('sf-cout').value=s.check_out_time.substring(0,5);
+    document.getElementById('sf-ot').checked=!!s.has_ot;
+    document.getElementById('sf-delete').style.display='block';
+  } else {
+    document.getElementById('sf-title').textContent='เพิ่มกะงานใหม่';
+    document.getElementById('sf-id').value='';
+    document.getElementById('sf-name').value='';
+    document.getElementById('sf-cin').value='';
+    document.getElementById('sf-cout').value='';
+    document.getElementById('sf-ot').checked=false;
+    document.getElementById('sf-delete').style.display='none';
+  }
+  openModal('modal-shift-form');
+}
+
+async function saveShift(){
+  const id=document.getElementById('sf-id').value;
+  const shift_name=document.getElementById('sf-name').value.trim();
+  const cin=document.getElementById('sf-cin').value.trim();
+  const cout=document.getElementById('sf-cout').value.trim();
+  const has_ot=document.getElementById('sf-ot').checked;
+  if(!shift_name||!cin||!cout){toast('กรุณากรอกข้อมูลให้ครบ','#E53935');return;}
+  const timeRx=/^\d{2}:\d{2}$/;
+  if(!timeRx.test(cin)||!timeRx.test(cout)){toast('รูปแบบเวลาต้องเป็น HH:MM','#E53935');return;}
+  const payload={shift_name,check_in_time:cin+':00',check_out_time:cout+':00',has_ot};
+  let error;
+  if(id){({error}=await db.from('shifts').update(payload).eq('id',id));}
+  else{({error}=await db.from('shifts').insert(payload));}
+  if(error){toast('บันทึกไม่ได้: '+error.message,'#E53935');return;}
+  toast('✅ บันทึกกะงานแล้ว','#0B9E82');
+  closeModal('modal-shift-form');
+  const{data}=await db.from('shifts').select('*').order('check_in_time');
+  allShifts=data||[];
+  loadShiftList();
+}
+
+async function deleteShift(){
+  const id=document.getElementById('sf-id').value;
+  if(!id)return;
+  const used=allEmps.filter(e=>e.shift_id===id);
+  if(used.length){toast(`ไม่สามารถลบได้ มีพนักงาน ${used.length} คนใช้กะนี้อยู่`,'#E53935');return;}
+  if(!confirm('ลบกะงานนี้?'))return;
+  const{error}=await db.from('shifts').delete().eq('id',id);
+  if(error){toast('ลบไม่ได้: '+error.message,'#E53935');return;}
+  toast('🗑 ลบกะงานแล้ว','#E53935');
+  closeModal('modal-shift-form');
+  const{data}=await db.from('shifts').select('*').order('check_in_time');
+  allShifts=data||[];
+  loadShiftList();
+}
+
+// ==================== IMPORT EXCEL ====================
+
+let importAttRows=[], importLeaveRows=[];
+
+function openImportModal(){
+  resetImport();
+  openModal('modal-import');
+}
+
+function resetImport(){
+  document.getElementById('import-file-input').value='';
+  document.getElementById('import-file-name').textContent='แตะเพื่อเลือกไฟล์ .xlsx';
+  document.getElementById('import-preview').style.display='none';
+  document.getElementById('import-result').style.display='none';
+  importAttRows=[];importLeaveRows=[];
+}
+
+function previewImport(input){
+  const file=input.files[0];
+  if(!file)return;
+  document.getElementById('import-file-name').textContent=file.name;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+
+      // --- Sheet ลงเวลา ---
+      const attSheet=wb.Sheets['ลงเวลา'];
+      if(!attSheet){toast('ไม่พบ Sheet "ลงเวลา" ในไฟล์นี้','#E53935');return;}
+      const attRaw=XLSX.utils.sheet_to_json(attSheet,{header:1,defval:''});
+      // หัวตาราง row index 1 (0-based), ข้อมูลเริ่ม row 2
+      importAttRows=[];
+      for(let i=2;i<attRaw.length;i++){
+        const r=attRaw[i];
+        const dateVal=r[0];const empName=String(r[2]||'').trim();
+        const cin=String(r[3]||'').trim();const cout=String(r[4]||'').trim();
+        const shiftName=String(r[5]||'').trim();const branchName=String(r[6]||'').trim();
+        const note=String(r[7]||'').trim();
+        if(!dateVal||!empName)continue;
+        let dateStr='';
+        if(typeof dateVal==='string'&&dateVal.match(/^\d{4}-\d{2}-\d{2}/)){dateStr=dateVal.substring(0,10);}
+        else if(dateVal instanceof Date){dateStr=dateVal.toISOString().split('T')[0];}
+        else{const d=XLSX.SSF.parse_date_code(dateVal);if(d){dateStr=`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;}}
+        if(!dateStr)continue;
+        importAttRows.push({dateStr,empName,cin,cout,shiftName,branchName,note});
+      }
+
+      // --- Sheet วันลา ---
+      const lvSheet=wb.Sheets['วันลา'];
+      importLeaveRows=[];
+      if(lvSheet){
+        const lvRaw=XLSX.utils.sheet_to_json(lvSheet,{header:1,defval:''});
+        for(let i=2;i<lvRaw.length;i++){
+          const r=lvRaw[i];
+          const empName=String(r[0]||'').trim();
+          const leaveType=String(r[1]||'').trim().toLowerCase();
+          const startRaw=r[2];const endRaw=r[3];
+          const reason=String(r[5]||'').trim();
+          const status=String(r[6]||'pending').trim().toLowerCase()||'pending';
+          if(!empName||!leaveType||!startRaw)continue;
+          const toDate=v=>{
+            if(!v)return'';
+            if(typeof v==='string'&&v.match(/^\d{4}-\d{2}-\d{2}/))return v.substring(0,10);
+            if(v instanceof Date)return v.toISOString().split('T')[0];
+            const d=XLSX.SSF.parse_date_code(v);
+            return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:'';
+          };
+          const start_date=toDate(startRaw);const end_date=toDate(endRaw)||start_date;
+          if(!start_date)continue;
+          const days=Math.round((new Date(end_date)-new Date(start_date))/86400000)+1;
+          importLeaveRows.push({empName,leaveType,start_date,end_date,days,reason,status});
+        }
+      }
+
+      // แสดง preview
+      document.getElementById('imp-att-count').textContent=importAttRows.length;
+      document.getElementById('imp-leave-count').textContent=importLeaveRows.length;
+
+      // ตรวจสอบชื่อพนักงานที่ไม่พบในระบบ
+      const unknownEmps=[...new Set([
+        ...importAttRows.map(r=>r.empName),
+        ...importLeaveRows.map(r=>r.empName)
+      ])].filter(name=>!allEmps.find(e=>e.name===name));
+
+      const warnEl=document.getElementById('import-warn');
+      if(unknownEmps.length){
+        warnEl.style.display='block';
+        warnEl.innerHTML=`⚠️ ไม่พบพนักงานต่อไปนี้ในระบบ (จะถูกข้าม):<br><b>${unknownEmps.join(', ')}</b>`;
+      } else {warnEl.style.display='none';}
+
+      // ตารางตัวอย่าง 5 แถวแรก
+      const sample=importAttRows.slice(0,5);
+      document.getElementById('import-preview-table').innerHTML=`
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:#F0FBF8">${['วันที่','พนักงาน','เข้า','ออก','กะ'].map(h=>`<th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--teal2);border-bottom:1px solid var(--border)">${h}</th>`).join('')}</tr></thead>
+          <tbody>${sample.map(r=>`<tr>${[r.dateStr,r.empName,r.cin||'–',r.cout||'–',r.shiftName].map(v=>`<td style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:10px">${v}</td>`).join('')}</tr>`).join('')}
+          ${importAttRows.length>5?`<tr><td colspan="5" style="padding:6px 8px;font-size:10px;color:var(--text3)">... และอีก ${importAttRows.length-5} รายการ</td></tr>`:''}</tbody>
+        </table>`;
+
+      document.getElementById('import-preview').style.display='block';
+      document.getElementById('btn-do-import').disabled=importAttRows.length===0&&importLeaveRows.length===0;
+    } catch(err){toast('อ่านไฟล์ไม่ได้: '+err.message,'#E53935');}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function doImport(){
+  document.getElementById('btn-do-import').disabled=true;
+  document.getElementById('btn-do-import').textContent='⏳ กำลังนำเข้า...';
+
+  let attOk=0,attSkip=0,lvOk=0,lvSkip=0,errors=[];
+
+  // นำเข้าลงเวลา
+  for(const row of importAttRows){
+    const emp=allEmps.find(e=>e.name===row.empName);
+    if(!emp){attSkip++;continue;}
+    const shift=allShifts.find(s=>s.shift_name===row.shiftName)||allShifts.find(s=>emp.shift_id===s.id);
+    const branch=allBranches.find(b=>b.name===row.branchName)||allBranches.find(b=>emp.branch_id===b.id);
+
+    // คำนวณ check_in timestamp
+    const makeTS=(dateStr,timeStr)=>{
+      if(!timeStr||!timeStr.match(/^\d{1,2}:\d{2}/))return null;
+      return new Date(`${dateStr}T${timeStr.padStart(5,'0')}:00+07:00`).toISOString();
+    };
+    const check_in=makeTS(row.dateStr,row.cin);
+    const check_out=row.cout?makeTS(row.dateStr,row.cout):null;
+
+    // คำนวณ is_late
+    let is_late=false,late_minutes=0;
+    if(shift&&check_in){
+      const[sh,sm]=shift.check_in_time.split(':').map(Number);
+      const cinD=new Date(check_in);
+      late_minutes=Math.max(0,(cinD.getHours()*60+cinD.getMinutes())-(sh*60+sm));
+      is_late=late_minutes>5;
+    }
+
+    const rec={employee_id:emp.id,work_date:row.dateStr,check_in,check_out,
+      shift_id:shift?.id||emp.shift_id||null,branch_id:branch?.id||emp.branch_id||null,
+      is_late,late_minutes:is_late?late_minutes:0,note:row.note||null,source:'excel_import'};
+
+    // upsert (ถ้ามีแล้วจะ update)
+    const{error}=await db.from('attendance').upsert(rec,{onConflict:'employee_id,work_date',ignoreDuplicates:false});
+    if(error){errors.push(`${row.empName} ${row.dateStr}: ${error.message}`);attSkip++;}
+    else attOk++;
+  }
+
+  // นำเข้าวันลา
+  for(const row of importLeaveRows){
+    const emp=allEmps.find(e=>e.name===row.empName);
+    if(!emp){lvSkip++;continue;}
+    const rec={employee_id:emp.id,leave_type:row.leaveType,
+      start_date:row.start_date,end_date:row.end_date,days:row.days,
+      reason:row.reason||null,status:row.status,note:'นำเข้าจาก Excel'};
+    const{error}=await db.from('leave_requests').insert(rec);
+    if(error){errors.push(`ลา ${row.empName}: ${error.message}`);lvSkip++;}
+    else lvOk++;
+  }
+
+  // แสดงผลลัพธ์
+  document.getElementById('import-preview').style.display='none';
+  document.getElementById('import-result').style.display='block';
+  const hasErr=errors.length>0;
+  document.getElementById('import-result-icon').textContent=hasErr?'⚠️':'✅';
+  document.getElementById('import-result-title').textContent=hasErr?'นำเข้าเสร็จสิ้น (มีบางรายการข้าม)':'นำเข้าสำเร็จทั้งหมด!';
+  document.getElementById('import-result-sub').innerHTML=
+    `ลงเวลา: นำเข้า <b>${attOk}</b> รายการ${attSkip?` (ข้าม ${attSkip})`:''}` +
+    `<br>วันลา: นำเข้า <b>${lvOk}</b> รายการ${lvSkip?` (ข้าม ${lvSkip})`:''}` +
+    (errors.length?`<br><span style="color:#E53935;font-size:10px">${errors.slice(0,3).join('<br>')}${errors.length>3?`<br>...อีก ${errors.length-3} ข้อผิดพลาด`:''}</span>`:'');
+}
+
+// wire modal events for new modals
+document.getElementById('modal-shift').addEventListener('click',function(e){if(e.target===this)closeModal('modal-shift');});
+document.getElementById('modal-shift-form').addEventListener('click',function(e){if(e.target===this)closeModal('modal-shift-form');});
+document.getElementById('modal-import').addEventListener('click',function(e){if(e.target===this)closeModal('modal-import');});
+
+// patch openModal to load shift list
+const _origOpen2=window.openModal;
+window.openModal=function(id){
+  _origOpen2(id);
+  if(id==='modal-shift')loadShiftList();
+};
+
+document.getElementById('modal-my-payslip').addEventListener('click',function(e){if(e.target===this)closeModal('modal-my-payslip');});
+
+function openMyPayslip(){
+  const now=new Date();
+  const ym=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');
+  document.getElementById('ps-month').value=ym;
+  document.getElementById('my-payslip-content').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">เลือกเดือนแล้วกด "ดู"</div>';
+  openModal('modal-my-payslip');
+  loadMyPayslip();
+}
+
+async function loadMyPayslip(){
+  const ym=document.getElementById('ps-month').value;
+  if(!ym||!user){return;}
+  const[y,m]=ym.split('-');
+  const start=`${y}-${m}-01`;
+  const end=new Date(y,m,0).toISOString().split('T')[0];
+  const MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const thaiM=ym=>{const[y,m]=ym.split('-');return MONTHS[parseInt(m)-1]+' '+(parseInt(y)+543);};
+  const fmt=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  document.getElementById('my-payslip-content').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">กำลังโหลด...</div>';
+
+  const[{data:cfg,error:cfgErr},{data:atts},{data:advances}]=await Promise.all([
+    db.from('employee_salary').select('*').eq('employee_id',user.id).maybeSingle(),
+    db.from('attendance').select('*').eq('employee_id',user.id).gte('work_date',start).lte('work_date',end),
+    db.from('salary_advances').select('*').eq('employee_id',user.id).eq('year_month',ym).eq('status','approved')
+  ]);
+  if(cfgErr){document.getElementById('my-payslip-content').innerHTML=`<div style="text-align:center;padding:24px;color:#E53935">เกิดข้อผิดพลาด: ${cfgErr.message}</div>`;return;}
+
+  const base=cfg?.base_salary||0;
+  const workDays=(atts||[]).filter(a=>a.check_in).length;
+  const lateCount=(atts||[]).filter(a=>a.is_late).length;
+  const proratedBase=Math.round(base*(workDays/30)*100)/100;
+  const posPay=cfg?.position_pay||0;
+  const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
+  const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
+  const otherPay=cfg?.other_pay||0;
+  const otherDesc=cfg?.other_desc||'เงินเพิ่มอื่นๆ';
+  const otherDeduct=cfg?.other_deduct||0;
+  const otherDeductDesc=cfg?.other_deduct_desc||'หักอื่นๆ';
+  const otMins=(atts||[]).reduce((s,a)=>s+(a.ot_minutes||0),0);
+  const otPay=Math.round(otMins/60*(base/30/8)*1.5*100)/100;
+  const gross=proratedBase+posPay+licensePay+comm+otherPay+otPay;
+  const ss=Math.min(Math.min(base,7000)*0.05,350);
+  const advTotal=(advances||[]).reduce((s,a)=>s+(a.amount||0),0);
+  const net=gross-ss-otherDeduct-advTotal;
+
+  if(!cfg){
+    document.getElementById('my-payslip-content').innerHTML='<div style="text-align:center;padding:24px;color:var(--text3)">ยังไม่ได้กำหนดเงินเดือน<br>กรุณาติดต่อ HR</div>';
+    return;
+  }
+
+  document.getElementById('my-payslip-content').innerHTML=`
+    <div style="background:#E8F8F5;border-radius:10px;padding:12px 14px;margin-bottom:12px;text-align:center">
+      <div style="font-size:11px;color:#0D7A65;margin-bottom:2px">เงินเดือน ${thaiM(ym)}</div>
+      <div style="font-size:28px;font-weight:800;color:#0B9E82">฿${fmt(net)}</div>
+      <div style="font-size:11px;color:#0D7A65;margin-top:2px">รับสุทธิ</div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-align:center">มา ${workDays} วัน · สาย ${lateCount} ครั้ง${otMins?` · OT ${(otMins/60).toFixed(1)} ชม.`:''}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <tr style="background:#F0FBF8"><td colspan="2" style="padding:6px 10px;font-weight:700;color:#0D7A65;font-size:11px">รายรับ</td></tr>
+      <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">เงินเดือน (${workDays}/30 วัน)</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(proratedBase)}</td></tr>
+      ${posPay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่าตำแหน่ง</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(posPay)}</td></tr>`:''}
+      ${licensePay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่าใบขับขี่</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(licensePay)}</td></tr>`:''}
+      ${comm?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่าคอมมิชชั่น</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(comm)}</td></tr>`:''}
+      ${otherPay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${otherDesc}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(otherPay)}</td></tr>`:''}
+      ${otPay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่า OT</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(otPay)}</td></tr>`:''}
+      <tr style="background:#F0FBF8"><td colspan="2" style="padding:6px 10px;font-weight:700;color:#0D7A65;font-size:11px">รายหัก</td></tr>
+      <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ประกันสังคม</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(ss)})</td></tr>
+      ${otherDeduct?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${otherDeductDesc}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(otherDeduct)})</td></tr>`:''}
+      ${advTotal?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">เงินเบิกล่วงหน้า</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(advTotal)})</td></tr>`:''}
+    </table>`;
+}
 </script>
 </body>
 </html>
