@@ -320,27 +320,27 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
 
       <div class="menu-grid">
         <button class="menu-item" onclick="showPage('clock')">
-          <div class="menu-icon" style="background:#E8F8F5">⏱️</div>
+          <div class="menu-icon" style="background:transparent;padding:0"><img src="01_clock_in.png" style="width:44px;height:44px;border-radius:10px;object-fit:cover"></div>
           <div><div class="menu-label">ลงเวลา</div><div class="menu-sub">เช็คอิน / เช็คเอาท์</div></div>
         </button>
         <button class="menu-item" onclick="showPage('leave')">
-          <div class="menu-icon" style="background:#E3F2FD">📋</div>
+          <div class="menu-icon" style="background:transparent;padding:0"><img src="07_leave_request.png" style="width:44px;height:44px;border-radius:10px;object-fit:cover"></div>
           <div><div class="menu-label">ขอลา</div><div class="menu-sub">ยื่นคำขอลา</div></div>
         </button>
         <button class="menu-item" onclick="showPage('bonus')">
-          <div class="menu-icon" style="background:#FFF8E1">💰</div>
+          <div class="menu-icon" style="background:transparent;padding:0"><img src="11_attendance_bonus.png" style="width:44px;height:44px;border-radius:10px;object-fit:cover"></div>
           <div><div class="menu-label">เบี้ยขยัน</div><div class="menu-sub">ดูยอดสะสม</div></div>
         </button>
         <button class="menu-item" onclick="showPage('report')">
-          <div class="menu-icon" style="background:#FCE4EC">📊</div>
+          <div class="menu-icon" style="background:transparent;padding:0"><img src="08_report.png" style="width:44px;height:44px;border-radius:10px;object-fit:cover"></div>
           <div><div class="menu-label">รายงาน</div><div class="menu-sub">ประวัติลงเวลา</div></div>
         </button>
         <button class="menu-item" onclick="openMyPayslip()">
-          <div class="menu-icon" style="background:#E8F5E9"><img src="icon-512-payroll.png" style="width:28px;height:28px;border-radius:6px"></div>
+          <div class="menu-icon" style="background:transparent;padding:0"><img src="icon-512-payroll.png" style="width:44px;height:44px;border-radius:10px;object-fit:cover"></div>
           <div><div class="menu-label">เงินเดือน</div><div class="menu-sub">ดูสลิปของฉัน</div></div>
         </button>
         <button class="menu-item" onclick="showPage('announce')" style="grid-column:span 2">
-          <div class="menu-icon" style="background:#EDE7F6">📢</div>
+          <div class="menu-icon" style="background:transparent;padding:0"><img src="09_announcement.png" style="width:44px;height:44px;border-radius:10px;object-fit:cover"></div>
           <div><div class="menu-label">ประกาศ / ข่าวสาร</div><div class="menu-sub">ข้อมูลจาก HR รายเดือน</div></div>
         </button>
       </div>
@@ -604,14 +604,14 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
 
   <!-- BOTTOM NAV -->
   <div class="bottom-nav">
-    <button class="nav-item active" id="nav-home" onclick="showPage('home')"><div class="nav-icon">🏠</div>หน้าแรก</button>
-    <button class="nav-item" id="nav-clock" onclick="showPage('clock')"><div class="nav-icon">⏱️</div>ลงเวลา</button>
-    <button class="nav-item" id="nav-leave" onclick="showPage('leave')"><div class="nav-icon">📋</div>ลางาน</button>
-    <button class="nav-item" id="nav-report" onclick="showPage('report')"><div class="nav-icon">📊</div>รายงาน</button>
-    <button class="nav-item" id="nav-announce" onclick="showPage('announce')"><div class="nav-icon">📢</div>ประกาศ</button>
-    <button class="nav-item hr-nav" id="nav-admin" onclick="showPage('admin')" style="display:none"><div class="nav-icon">⚙️</div>Admin</button>
-    <button class="nav-item" id="nav-bonus" onclick="showPage('bonus')"><div class="nav-icon">💰</div>เบี้ยขยัน</button>
-    <button class="nav-item" id="nav-profile" onclick="showPage('profile')"><div class="nav-icon">👤</div>โปรไฟล์</button>
+    <button class="nav-item active" id="nav-home" onclick="showPage('home')"><div class="nav-icon"><img src="05_home.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"></div>หน้าแรก</button>
+    <button class="nav-item" id="nav-clock" onclick="showPage('clock')"><div class="nav-icon"><img src="01_clock_in.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"></div>ลงเวลา</button>
+    <button class="nav-item" id="nav-leave" onclick="showPage('leave')"><div class="nav-icon"><img src="07_leave_request.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"></div>ลางาน</button>
+    <button class="nav-item" id="nav-report" onclick="showPage('report')"><div class="nav-icon"><img src="08_report.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"></div>รายงาน</button>
+    <button class="nav-item" id="nav-announce" onclick="showPage('announce')"><div class="nav-icon"><img src="09_announcement.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"></div>ประกาศ</button>
+    <button class="nav-item hr-nav" id="nav-admin" onclick="showPage('admin')" style="display:none"><div class="nav-icon"><img src="10_settings.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"></div>Admin</button>
+    <button class="nav-item" id="nav-bonus" onclick="showPage('bonus')"><div class="nav-icon"><img src="11_attendance_bonus.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"></div>เบี้ยขยัน</button>
+    <button class="nav-item" id="nav-profile" onclick="showPage('profile')"><div class="nav-icon"><img src="12_profile.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"></div>โปรไฟล์</button>
   </div>
 </div>
 
@@ -1478,9 +1478,9 @@ async function loadReport(){
     let badge='ยังไม่มา',badgeCls='badge-absent',sub='--';
     if(l){onleave++;badge=LLABELS[l.leave_type]||'ลา';badgeCls='badge-leave';sub='ลางาน';}
     else if(a?.check_in){
-      present++;let lateMin=0;
-      if(shift){const[sh,sm]=shift.check_in_time.split(':').map(Number);const cin=new Date(a.check_in);lateMin=(cin.getHours()*60+cin.getMinutes())-(sh*60+sm);}
-      if(lateMin>5){late++;badge='สาย '+lateMin+'น.';badgeCls='badge-late';}
+      present++;
+      // ใช้ is_late ที่บันทึกตอนเช็คอินจริง ไม่คำนวณใหม่จากกะปัจจุบัน
+      if(a.is_late){late++;badge='สาย'+(a.late_minutes?` ${a.late_minutes}น.`:'');badgeCls='badge-late';}
       else{badge='ตรงเวลา';badgeCls='badge-ok';}
       sub=(br?br.name:'')+(a.check_in?' เข้า '+fmtT(a.check_in):'')+(a.check_out?' ออก '+fmtT(a.check_out):'');
     }
