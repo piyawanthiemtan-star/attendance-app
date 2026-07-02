@@ -324,19 +324,19 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
 
       <div class="menu-grid">
         <button class="menu-item" onclick="showPage('clock')">
-          <div class="menu-icon"><img src="01_clock_in.png" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="01_clock_in.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">ลงเวลา</div><div class="menu-sub">เช็คอิน / เช็คเอาท์</div></div>
         </button>
         <button class="menu-item" onclick="showPage('leave')">
-          <div class="menu-icon"><img src="07_leave_request.png" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="07_leave_request.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">ขอลา</div><div class="menu-sub">ยื่นคำขอลา</div></div>
         </button>
         <button class="menu-item" onclick="showPage('bonus')">
-          <div class="menu-icon"><img src="11_attendance_bonus.png" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="11_attendance_bonus.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">เบี้ยขยัน</div><div class="menu-sub">ดูยอดสะสม</div></div>
         </button>
         <button class="menu-item" onclick="showPage('report')">
-          <div class="menu-icon"><img src="08_report.png" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="08_report.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">รายงาน</div><div class="menu-sub">ประวัติลงเวลา</div></div>
         </button>
         <button class="menu-item" onclick="openMyPayslip()">
@@ -344,7 +344,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
           <div><div class="menu-label">เงินเดือน</div><div class="menu-sub">ดูสลิปของฉัน</div></div>
         </button>
         <button class="menu-item" onclick="showPage('announce')" style="grid-column:span 2">
-          <div class="menu-icon"><img src="09_announcement.png" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="09_announcement.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">ประกาศ / ข่าวสาร</div><div class="menu-sub">ข้อมูลจาก HR รายเดือน</div></div>
         </button>
       </div>
@@ -375,12 +375,12 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <label class="modal-label" style="margin-top:0">หมายเหตุ (ถ้ามี)</label>
       <textarea class="note-input" id="checkin-note" placeholder="เพิ่มหมายเหตุ..."></textarea>
 
-      <button class="btn-checkin-big" id="btn-cin" onclick="openShiftSelect()"><img src="01_clock_in.png" style="width:28px;height:28px;border-radius:6px;object-fit:cover"> เช็คอิน <span id="btn-cin-time"></span></button>
+      <button class="btn-checkin-big" id="btn-cin" onclick="openShiftSelect()"><img src="01_clock_in.png?v=2" style="width:28px;height:28px;border-radius:6px;object-fit:cover"> เช็คอิน <span id="btn-cin-time"></span></button>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <button style="padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#F57F17,#E65100);color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px" id="btn-break-start" onclick="doBreakStart()"><img src="03_break_out.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"> ออกพัก <span id="btn-break-time"></span></button>
-        <button style="padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px" id="btn-break-end" onclick="doBreakEnd()"><img src="04_back_to_work.png" style="width:26px;height:26px;border-radius:6px;object-fit:cover"> กลับมาทำงาน</button>
+        <button style="padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#F57F17,#E65100);color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px" id="btn-break-start" onclick="doBreakStart()"><img src="03_break_out.png?v=2" style="width:26px;height:26px;border-radius:6px;object-fit:cover"> ออกพัก <span id="btn-break-time"></span></button>
+        <button style="padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px" id="btn-break-end" onclick="doBreakEnd()"><img src="04_back_to_work.png?v=2" style="width:26px;height:26px;border-radius:6px;object-fit:cover"> กลับมาทำงาน</button>
       </div>
-      <button class="btn-checkout-big" id="btn-cout" onclick="doCheckout()"><img src="02_clock_out.png" style="width:28px;height:28px;border-radius:6px;object-fit:cover"> เช็คเอาท์ <span id="btn-cout-time"></span></button>
+      <button class="btn-checkout-big" id="btn-cout" onclick="doCheckout()"><img src="02_clock_out.png?v=2" style="width:28px;height:28px;border-radius:6px;object-fit:cover"> เช็คเอาท์ <span id="btn-cout-time"></span></button>
       <button id="btn-missed" onclick="doMissedCheckin()" style="width:100%;padding:12px;border-radius:var(--r);border:1.5px dashed var(--border);background:var(--white);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;display:none">⚠️ ลืมเช็คอิน? กดที่นี่</button>
 
       <div class="card">
@@ -490,7 +490,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <div class="admin-section">
         <div class="admin-section-title">จัดการระบบ <span id="role-badge" style="font-size:10px;padding:2px 8px;border-radius:20px;background:#E3F2FD;color:#1565C0;font-weight:600;margin-left:6px"></span></div>
         <button class="admin-item" onclick="openModal('modal-emp')">
-          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="12_profile.png" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
+          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="12_profile.png?v=2" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
           <div class="admin-item-info"><div class="admin-item-label">พนักงาน</div><div class="admin-item-sub">เพิ่ม แก้ไข ลบพนักงาน</div></div>
           <div class="admin-item-arrow">›</div>
         </button>
@@ -505,7 +505,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
           <div class="admin-item-arrow">›</div>
         </button>
         <a href="time-report.html" class="admin-item" style="text-decoration:none;color:inherit">
-          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="08_report.png" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
+          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="08_report.png?v=2" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
           <div class="admin-item-info"><div class="admin-item-label">รายงานเวลาทำงาน</div><div class="admin-item-sub">ดูและ Export Excel รายบุคคล</div></div>
           <div class="admin-item-arrow">›</div>
         </a>
@@ -613,14 +613,14 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
 
   <!-- BOTTOM NAV -->
   <div class="bottom-nav">
-    <button class="nav-item active" id="nav-home" onclick="showPage('home')"><div class="nav-icon"><img src="05_home.png" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>หน้าแรก</button>
-    <button class="nav-item" id="nav-clock" onclick="showPage('clock')"><div class="nav-icon"><img src="01_clock_in.png" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ลงเวลา</button>
-    <button class="nav-item" id="nav-leave" onclick="showPage('leave')"><div class="nav-icon"><img src="07_leave_request.png" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ลางาน</button>
-    <button class="nav-item" id="nav-report" onclick="showPage('report')"><div class="nav-icon"><img src="08_report.png" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>รายงาน</button>
-    <button class="nav-item" id="nav-announce" onclick="showPage('announce')"><div class="nav-icon"><img src="09_announcement.png" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ประกาศ</button>
-    <button class="nav-item hr-nav" id="nav-admin" onclick="showPage('admin')" style="display:none"><div class="nav-icon"><img src="10_settings.png" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>Admin</button>
-    <button class="nav-item" id="nav-bonus" onclick="showPage('bonus')"><div class="nav-icon"><img src="11_attendance_bonus.png" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>เบี้ยขยัน</button>
-    <button class="nav-item" id="nav-profile" onclick="showPage('profile')"><div class="nav-icon"><img src="12_profile.png" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>โปรไฟล์</button>
+    <button class="nav-item active" id="nav-home" onclick="showPage('home')"><div class="nav-icon"><img src="05_home.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>หน้าแรก</button>
+    <button class="nav-item" id="nav-clock" onclick="showPage('clock')"><div class="nav-icon"><img src="01_clock_in.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ลงเวลา</button>
+    <button class="nav-item" id="nav-leave" onclick="showPage('leave')"><div class="nav-icon"><img src="07_leave_request.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ลางาน</button>
+    <button class="nav-item" id="nav-report" onclick="showPage('report')"><div class="nav-icon"><img src="08_report.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>รายงาน</button>
+    <button class="nav-item" id="nav-announce" onclick="showPage('announce')"><div class="nav-icon"><img src="09_announcement.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ประกาศ</button>
+    <button class="nav-item hr-nav" id="nav-admin" onclick="showPage('admin')" style="display:none"><div class="nav-icon"><img src="10_settings.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>Admin</button>
+    <button class="nav-item" id="nav-bonus" onclick="showPage('bonus')"><div class="nav-icon"><img src="11_attendance_bonus.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>เบี้ยขยัน</button>
+    <button class="nav-item" id="nav-profile" onclick="showPage('profile')"><div class="nav-icon"><img src="12_profile.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>โปรไฟล์</button>
   </div>
 </div>
 
