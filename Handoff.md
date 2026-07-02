@@ -1,6 +1,6 @@
 # Handoff — LSMG Time Attendance & Payroll System
 
-**วันที่อัปเดต:** 1 กรกฎาคม 2569  
+**วันที่อัปเดต:** 2 กรกฎาคม 2569  
 **โปรเจกต์:** LOEI SMART GROUP — ระบบลงเวลาและเงินเดือนพนักงาน  
 **GitHub:** https://github.com/piyawanthiemtan-star/attendance-app  
 **Live URL:** https://piyawanthiemtan-star.github.io/attendance-app/ (หรือ URL ที่ deploy)  
@@ -111,6 +111,23 @@ OT/ชม.     = (เงินเดือน / 30 / 8) × 1.5
 
 ---
 
+## งานที่เสร็จแล้ว (2 ก.ค. 2569 — Icon & Cache)
+
+| # | งาน | สถานะ |
+|---|-----|--------|
+| 1 | แก้ menu icon หน้าแรกไม่ขึ้น/เล็ก — `.menu-icon` เพิ่ม `overflow:hidden`, คง 56×56 | ✅ เสร็จ |
+| 2 | เปลี่ยน img จาก `object-fit:cover` → `contain` (ไม่ตัดขอบรูป) | ✅ เสร็จ |
+| 3 | Crop ขอบโปร่งใสออกจาก icon 12 ไฟล์ (01–12) ให้เต็มกรอบเท่า payroll | ✅ เสร็จ |
+| 4 | Cache-bust `?v=2` ทุก icon (19 จุด) + bump SW `CACHE_NAME` → v2 | ✅ เสร็จ |
+
+**Root cause icon:** ไฟล์ 01–12 เดิมเป็น 512×512 แต่ artwork กินแค่ ~54% (ขอบโปร่งใส ~128px รอบๆ) ส่วน `icon-512-payroll.png` เต็ม 99% พอ `object-fit:contain` ย่อทั้ง canvas ตัวมีขอบโปร่งใสเลยดูเล็กกว่า → แก้โดย crop เนื้อให้เต็มกรอบ (เหลือ ~287×287). ต้นฉบับ 512×512 สำรองใน `icons_backup/` (local เท่านั้น ไม่ push).
+
+**Root cause "ไม่เปลี่ยน":** deploy สำเร็จตั้งแต่แรก (live Pages = 287 แล้ว) แต่เบราว์เซอร์ cache รูปเก่า → แก้ด้วย `?v=2` ทำให้พนักงานทุกคนโหลดรูปใหม่อัตโนมัติ ไม่ต้อง unregister SW ทีละเครื่อง.
+
+**Commits:** `fd241b0` (56×56+overflow), `c6d05bf` (crop 12 ไฟล์), `602747d` (cache-bust ?v=2 + SW v2) — push ขึ้น main แล้ว
+
+---
+
 ## งานที่ยังค้างอยู่
 
 | # | งาน | หมายเหตุ |
@@ -153,6 +170,7 @@ ALTER TABLE employee_salary
 - **PIN auth ≠ Supabase Auth** — `auth.uid()` จะ return NULL เสมอ อย่าใช้ใน RLS policy
 - **RLS payroll tables** ตั้งเป็น `allow_all` เพราะ PIN auth — การ protect ทำที่ UI
 - **Service Worker** cache แรงมาก — ต้อง Unregister ทุกครั้งที่ test หลัง deploy
+- **เปลี่ยนไฟล์ asset (icon/รูป)** ต้อง bump `?v=N` ต่อท้าย `src=` ทุก reference + bump SW `CACHE_NAME` ไม่งั้นเบราว์เซอร์พนักงานจำรูปเก่า (ปัจจุบัน `?v=2` / `lsg-attendance-v2`)
 - **`employee_salary` มี UNIQUE(employee_id)** — upsert ด้วย `onConflict:'employee_id'`
 - **รายงานสาย** ใช้ `a.is_late` จาก DB ไม่คำนวณใหม่ — อย่าเปลี่ยนกลับ
 - **payroll.html login** แสดงเฉพาะ role='owner' ในรายชื่อ
