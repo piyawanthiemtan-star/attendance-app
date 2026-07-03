@@ -269,14 +269,15 @@ async function loadReport(){
         cin=fmtT(att.check_in);
         cout=att.check_out?fmtT(att.check_out):'(ยังอยู่)';
         if(att.check_out) workMins=diffMins(att.check_in,att.check_out);
-        if(shift){
-          const[sh,sm]=shift.check_in_time.split(':').map(Number);
+        const rShift=allShifts.find(x=>x.id===att.shift_id)||shift;  // กะของ record วันนั้นก่อน (รองรับกะรายวัน) ค่อย fallback กะประจำตัว
+        if(rShift){
+          const[sh,sm]=rShift.check_in_time.split(':').map(Number);
           const cinD=new Date(att.check_in);
           lateMins=Math.max(0,(cinD.getHours()*60+cinD.getMinutes())-(sh*60+sm));
           if(lateMins>5){empLate++;empLateMin+=lateMins;totLate++;totLateMin+=lateMins;status='late';}
           else status='ok';
           // OT
-          if(shift.has_ot&&att.ot_minutes){otMins=att.ot_minutes;empOT+=otMins/60;totOT+=otMins/60;}
+          if(rShift.has_ot&&att.ot_minutes){otMins=att.ot_minutes;empOT+=otMins/60;totOT+=otMins/60;}
         } else status='ok';
         if(lv) note='';
       } else {
