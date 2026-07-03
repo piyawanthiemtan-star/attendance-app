@@ -267,6 +267,7 @@ const{createClient}=supabase;
 const db=createClient(SB_URL,SB_KEY);
 
 const MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const dateStr=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; // YYYY-MM-DD เวลาท้องถิ่น
 const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
 const ADVANCE_AMOUNT=4000; // รอบ 1 จ่ายคงที่
 
@@ -328,7 +329,7 @@ async function loadMainData(){
   document.getElementById('sum-month').value=ym;
   document.getElementById('run-month').value=ym;
   document.getElementById('adv-month').value=ym;
-  document.getElementById('adv-date').value=now.toISOString().split('T')[0];
+  document.getElementById('adv-date').value=dateStr(now);
   document.getElementById('hdr-period').textContent=thaiM(ym);
 
   const[{data:emps},{data:configs},{data:runs}]=await Promise.all([
@@ -674,7 +675,7 @@ async function saveSalaryConfig(){
     other_deduct:parseFloat(document.getElementById('ms-deduct').value)||0,
     other_deduct_desc:document.getElementById('ms-deduct-desc').value.trim(),
     note:document.getElementById('ms-note').value.trim(),
-    effective_date:new Date().toISOString().split('T')[0],
+    effective_date:dateStr(new Date()),
     updated_at:new Date().toISOString()
   };
   const{error}=await db.from('employee_salary').upsert(payload,{onConflict:'employee_id'});

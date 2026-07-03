@@ -176,12 +176,14 @@ function toggleFilter(){
   document.getElementById('filter-to').style.display=t==='range'?'flex':'none';
 }
 
+const dateStr=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; // YYYY-MM-DD เวลาท้องถิ่น (ไม่แปลง UTC)
+
 async function init(){
   // Set default month
   const now=new Date();
   document.getElementById('sel-month').value=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');
-  document.getElementById('sel-from').value=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
-  document.getElementById('sel-to').value=now.toISOString().split('T')[0];
+  document.getElementById('sel-from').value=dateStr(new Date(now.getFullYear(),now.getMonth(),1));
+  document.getElementById('sel-to').value=dateStr(now);
 
   const[{data:emps},{data:branches},{data:shifts}]=await Promise.all([
     db.from('employees').select('*').order('name'),
@@ -235,7 +237,7 @@ async function loadReport(){
   const dates=[];
   const cur=new Date(start+'T00:00:00');
   const endD=new Date(end+'T00:00:00');
-  while(cur<=endD){dates.push(cur.toISOString().split('T')[0]);cur.setDate(cur.getDate()+1);}
+  while(cur<=endD){dates.push(dateStr(cur));cur.setDate(cur.getDate()+1);}
 
   // Build report data
   reportData=[];

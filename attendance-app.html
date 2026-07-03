@@ -989,7 +989,8 @@ function fmtT(ts){
   const d=new Date(ts);
   return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
 }
-function todayStr(){return new Date().toISOString().split('T')[0];}
+function dateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;} // YYYY-MM-DD เวลาท้องถิ่น (ไม่แปลง UTC)
+function todayStr(){return dateStr(new Date());}
 function monthStr(d){const dt=d||new Date();return dt.getFullYear()+'-'+(dt.getMonth()+1).toString().padStart(2,'0');}
 function thaiM(ym){const[y,m]=ym.split('-');const ms=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return ms[parseInt(m)]+' '+(parseInt(y)+543);}
 // เบี้ยขยันเริ่มใช้ เม.ย. 2569 (เดือนก่อนหน้าไม่ได้รับเบี้ยขยันทุกคน)
@@ -1481,8 +1482,8 @@ async function submitLeave(){
 async function loadBonus(){
   const{data:records}=await db.from('attendance_bonus').select('*').eq('employee_id',user.id).gte('year_month',BONUS_START_YM).order('year_month',{ascending:false}).limit(12);
   const now=new Date();
-  const ms=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
-  const me=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().split('T')[0];
+  const ms=dateStr(new Date(now.getFullYear(),now.getMonth(),1));
+  const me=dateStr(new Date(now.getFullYear(),now.getMonth()+1,0));
   const{data:atts}=await db.from('attendance').select('*').eq('employee_id',user.id).gte('work_date',ms).lte('work_date',me);
   const{data:leaves}=await db.from('leave_requests').select('*').eq('employee_id',user.id).eq('status','approved').gte('start_date',ms).lte('end_date',me);
   let lateDays=(atts||[]).filter(a=>attIsLate(a,user.shift_id)).length;
@@ -2517,7 +2518,7 @@ function previewImport(input){
           const toDate=v=>{
             if(!v)return'';
             if(typeof v==='string'&&v.match(/^\d{4}-\d{2}-\d{2}/))return v.substring(0,10);
-            if(v instanceof Date)return v.toISOString().split('T')[0];
+            if(v instanceof Date)return dateStr(v);
             const d=XLSX.SSF.parse_date_code(v);
             return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:'';
           };
