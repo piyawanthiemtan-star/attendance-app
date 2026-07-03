@@ -358,7 +358,7 @@ async function loadSummary(){
   document.getElementById('hdr-period').textContent=thaiM(ym);
   const[y,m]=ym.split('-');
   const start=`${y}-${m}-01`;
-  const end=new Date(y,m,0).toISOString().split('T')[0];
+  const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
 
   const[{data:atts},{data:leaves},{data:payItems}]=await Promise.all([
     db.from('attendance').select('*').gte('work_date',start).lte('work_date',end),
@@ -432,7 +432,7 @@ async function showPayslip(empId,ym){
   const emp=allEmps.find(e=>e.id===empId);if(!emp)return;
   const cfg=salaryConfigs.find(c=>c.employee_id===empId);
   const[y,m]=ym.split('-');
-  const start=`${y}-${m}-01`;const end=new Date(y,m,0).toISOString().split('T')[0];
+  const start=`${y}-${m}-01`;const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
   const[{data:atts},{data:leaves},{data:advances}]=await Promise.all([
     db.from('attendance').select('*').eq('employee_id',empId).gte('work_date',start).lte('work_date',end),
     db.from('leave_requests').select('*').eq('employee_id',empId).eq('status','approved').gte('start_date',start).lte('end_date',end),
@@ -551,7 +551,7 @@ async function createRun(){
 
 async function calcAndSaveItems(run){
   const[y,m]=run.year_month.split('-');
-  const start=`${y}-${m}-01`;const end=new Date(y,m,0).toISOString().split('T')[0];
+  const start=`${y}-${m}-01`;const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
   const[{data:atts},{data:leaves},{data:advances}]=await Promise.all([
     db.from('attendance').select('*').gte('work_date',start).lte('work_date',end),
     db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end),

@@ -201,7 +201,7 @@ function getDateRange(){
   if(t==='monthly'){
     const ym=document.getElementById('sel-month').value;
     const[y,m]=ym.split('-');
-    return{start:`${y}-${m}-01`,end:new Date(y,m,0).toISOString().split('T')[0],label:`${MONTHS[parseInt(m)-1]} ${parseInt(y)+543}`};
+    return{start:`${y}-${m}-01`,end:`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`,label:`${MONTHS[parseInt(m)-1]} ${parseInt(y)+543}`};
   } else {
     const from=document.getElementById('sel-from').value;
     const to=document.getElementById('sel-to').value;

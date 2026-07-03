@@ -1658,7 +1658,7 @@ async function loadMyAttHistory() {
 async function loadMonthly(){
   const ym=document.getElementById('r-month').value||monthStr();
   const[y,m]=ym.split('-');
-  const start=`${y}-${m}-01`,end=new Date(y,m,0).toISOString().split('T')[0];
+  const start=`${y}-${m}-01`,end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
   const{data:emps}=await db.from('employees').select('*').order('name');
   const{data:atts}=await db.from('attendance').select('*').gte('work_date',start).lte('work_date',end);
   const{data:leaves}=await db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end);
@@ -2678,7 +2678,7 @@ async function loadMyPayslip(){
   if(!ym||!user){return;}
   const[y,m]=ym.split('-');
   const start=`${y}-${m}-01`;
-  const end=new Date(y,m,0).toISOString().split('T')[0];
+  const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
   const MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const thaiM=ym=>{const[y,m]=ym.split('-');return MONTHS[parseInt(m)-1]+' '+(parseInt(y)+543);};
   const fmt=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
