@@ -1,10 +1,22 @@
 # Handoff — LSMG Time Attendance & Payroll System
 
-**วันที่อัปเดต:** 2 กรกฎาคม 2569  
+**วันที่อัปเดต:** 3 กรกฎาคม 2569  
 **โปรเจกต์:** LOEI SMART GROUP — ระบบลงเวลาและเงินเดือนพนักงาน  
 **GitHub:** https://github.com/piyawanthiemtan-star/attendance-app  
 **Live URL:** https://piyawanthiemtan-star.github.io/attendance-app/ (หรือ URL ที่ deploy)  
 **Supabase Project:** ihtpdwgdbcxojpmisaaz  
+
+---
+
+## 📍 ตำแหน่งไฟล์ (อ่านก่อนเริ่มงาน)
+
+- **ตัวจริงที่ใช้งาน (canonical):** `D:\1. SmartPet AI Framework\SmartPetAI\Project\attendance-app\`
+  จัดเก็บตามมาตรฐาน SmartPet AI Framework (ดู `SmartPet AI Framework Guide.pdf`) — ทำงานและ push จากที่นี่เท่านั้น
+- **`C:\HR_attendance-system`** = สำเนาเก่า ก่อนย้าย (3 ก.ค. 2569) — **รอลบทิ้ง** อย่าแก้ไฟล์ในนี้
+  > ลบไม่สำเร็จจาก session ที่รันอยู่ในโฟลเดอร์ C: เอง (Windows ล็อก cwd) — ให้ลบจาก session ที่ cwd อยู่นอก C: หรือลบเองใน File Explorer
+- Backup ระบบ → `D:\1. SmartPet AI Framework\SmartPetBackup\` (โค้ด zip + dump Supabase `.sql`)
+- ความลับ (Supabase key / .env) → `D:\1. SmartPet AI Framework\SmartPetVault\`
+- Push เข้า GitHub repo เดิม: `git push origin master:main`
 
 ---
 
