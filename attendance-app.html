@@ -2441,9 +2441,13 @@ async function deleteShift(){
 
 let importAttRows=[], importLeaveRows=[];
 
-function openImportModal(){
+async function openImportModal(){
   resetImport();
   openModal('modal-import');
+  // import ใช้ allEmps/allShifts/allBranches — โหลดถ้ายังว่าง (กันเคสเปิด import โดยไม่แวะหน้าจัดการพนักงาน)
+  if(!allEmps.length){const{data}=await db.from('employees').select('*').order('name');allEmps=data||[];}
+  if(!allShifts.length){const{data}=await db.from('shifts').select('*').order('shift_name');allShifts=data||[];}
+  if(!allBranches.length){const{data}=await db.from('branches').select('*').order('name');allBranches=data||[];}
 }
 
 function resetImport(){
@@ -2454,6 +2458,21 @@ function resetImport(){
   importAttRows=[];importLeaveRows=[];
 }
 
+// แปลงค่าจาก Excel (serial number / Date / text) → date "YYYY-MM-DD" และ time "HH:MM" โดยไม่มีปัญหา timezone
+function xlsxDate(v){
+  if(v==null||v==='')return'';
+  if(v instanceof Date)return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
+  if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:'';}
+  const s=String(v).trim();
+  if(s.match(/^\d{4}-\d{2}-\d{2}/))return s.substring(0,10);
+  const d=XLSX.SSF.parse_date_code(s);return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:'';
+}
+function xlsxTime(v){
+  if(v==null||v==='')return'';
+  if(typeof v==='number'){const mins=Math.round((v-Math.floor(v))*1440);return `${String(Math.floor(mins/60)).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`;}
+  if(v instanceof Date)return `${String(v.getHours()).padStart(2,'0')}:${String(v.getMinutes()).padStart(2,'0')}`;
+  const m=String(v).trim().match(/(\d{1,2}):(\d{2})/);return m?`${m[1].padStart(2,'0')}:${m[2]}`:'';
+}
 function previewImport(input){
   const file=input.files[0];
   if(!file)return;
@@ -2461,7 +2480,7 @@ function previewImport(input){
   const reader=new FileReader();
   reader.onload=function(e){
     try{
-      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const wb=XLSX.read(e.target.result,{type:'array'});
 
       // --- Sheet ลงเวลา ---
       const attSheet=wb.Sheets['ลงเวลา'];
@@ -2471,16 +2490,12 @@ function previewImport(input){
       importAttRows=[];
       for(let i=2;i<attRaw.length;i++){
         const r=attRaw[i];
-        const dateVal=r[0];const empName=String(r[2]||'').trim();
-        const cin=String(r[3]||'').trim();const cout=String(r[4]||'').trim();
+        const empName=String(r[2]||'').trim();
+        const cin=xlsxTime(r[3]);const cout=xlsxTime(r[4]);
         const shiftName=String(r[5]||'').trim();const branchName=String(r[6]||'').trim();
         const note=String(r[7]||'').trim();
-        if(!dateVal||!empName)continue;
-        let dateStr='';
-        if(typeof dateVal==='string'&&dateVal.match(/^\d{4}-\d{2}-\d{2}/)){dateStr=dateVal.substring(0,10);}
-        else if(dateVal instanceof Date){dateStr=dateVal.toISOString().split('T')[0];}
-        else{const d=XLSX.SSF.parse_date_code(dateVal);if(d){dateStr=`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;}}
-        if(!dateStr)continue;
+        const dateStr=xlsxDate(r[0]);
+        if(!dateStr||!empName)continue;
         importAttRows.push({dateStr,empName,cin,cout,shiftName,branchName,note});
       }
 
@@ -2547,7 +2562,30 @@ async function doImport(){
   document.getElementById('btn-do-import').disabled=true;
   document.getElementById('btn-do-import').textContent='⏳ กำลังนำเข้า...';
 
-  let attOk=0,attSkip=0,lvOk=0,lvSkip=0,errors=[];
+  let attNew=0,attFill=0,attSkip=0,lvOk=0,lvSkip=0,errors=[];
+
+  // ดึงข้อมูลลงเวลาที่ "มีอยู่แล้ว" ในช่วงวันที่จะนำเข้า — กันการเขียนทับเวลาที่ลงไว้แล้ว
+  const impDates=[...new Set(importAttRows.map(r=>r.dateStr))];
+  const existingMap=new Map();
+  if(impDates.length){
+    const{data:exist,error:exErr}=await db.from('attendance')
+      .select('id,employee_id,work_date,check_in,check_out,shift_id,branch_id,note')
+      .in('work_date',impDates);
+    if(exErr){errors.push('อ่านข้อมูลเดิม: '+exErr.message);}
+    (exist||[]).forEach(a=>existingMap.set(`${a.employee_id}|${a.work_date}`,a));
+  }
+
+  const makeTS=(dateStr,timeStr)=>{
+    if(!timeStr||!timeStr.match(/^\d{1,2}:\d{2}/))return null;
+    return new Date(`${dateStr}T${timeStr.padStart(5,'0')}:00+07:00`).toISOString();
+  };
+  const calcLate=(shift,check_in)=>{
+    if(!shift||!check_in)return{is_late:false,late_minutes:0};
+    const[sh,sm]=shift.check_in_time.split(':').map(Number);
+    const cinD=new Date(check_in);
+    const late=Math.max(0,(cinD.getHours()*60+cinD.getMinutes())-(sh*60+sm));
+    return{is_late:late>5,late_minutes:late>5?late:0};
+  };
 
   // นำเข้าลงเวลา
   for(const row of importAttRows){
@@ -2555,32 +2593,35 @@ async function doImport(){
     if(!emp){attSkip++;continue;}
     const shift=allShifts.find(s=>s.shift_name===row.shiftName)||allShifts.find(s=>emp.shift_id===s.id);
     const branch=allBranches.find(b=>b.name===row.branchName)||allBranches.find(b=>emp.branch_id===b.id);
-
-    // คำนวณ check_in timestamp
-    const makeTS=(dateStr,timeStr)=>{
-      if(!timeStr||!timeStr.match(/^\d{1,2}:\d{2}/))return null;
-      return new Date(`${dateStr}T${timeStr.padStart(5,'0')}:00+07:00`).toISOString();
-    };
     const check_in=makeTS(row.dateStr,row.cin);
     const check_out=row.cout?makeTS(row.dateStr,row.cout):null;
 
-    // คำนวณ is_late
-    let is_late=false,late_minutes=0;
-    if(shift&&check_in){
-      const[sh,sm]=shift.check_in_time.split(':').map(Number);
-      const cinD=new Date(check_in);
-      late_minutes=Math.max(0,(cinD.getHours()*60+cinD.getMinutes())-(sh*60+sm));
-      is_late=late_minutes>5;
+    const existing=existingMap.get(`${emp.id}|${row.dateStr}`);
+    if(existing){
+      // มีข้อมูลแล้ว → เติมเฉพาะช่องที่ว่าง ห้ามเขียนทับค่าที่ลงไว้แล้ว
+      const upd={};
+      if(!existing.check_in && check_in){
+        upd.check_in=check_in;
+        const l=calcLate(shift,check_in);upd.is_late=l.is_late;upd.late_minutes=l.late_minutes;
+      }
+      if(!existing.check_out && check_out)upd.check_out=check_out;
+      if(!existing.shift_id && (shift?.id||emp.shift_id))upd.shift_id=shift?.id||emp.shift_id;
+      if(!existing.branch_id && (branch?.id||emp.branch_id))upd.branch_id=branch?.id||emp.branch_id;
+      if(!existing.note && row.note)upd.note=row.note;
+      if(Object.keys(upd).length===0){attSkip++;continue;}  // ไม่มีอะไรให้เติม
+      const{error}=await db.from('attendance').update(upd).eq('id',existing.id);
+      if(error){errors.push(`${row.empName} ${row.dateStr}: ${error.message}`);attSkip++;}
+      else attFill++;
+    } else {
+      // วันใหม่ → เพิ่ม record
+      const l=calcLate(shift,check_in);
+      const rec={employee_id:emp.id,work_date:row.dateStr,check_in,check_out,
+        shift_id:shift?.id||emp.shift_id||null,branch_id:branch?.id||emp.branch_id||null,
+        is_late:l.is_late,late_minutes:l.late_minutes,note:row.note||null,source:'excel_import'};
+      const{error}=await db.from('attendance').insert(rec);
+      if(error){errors.push(`${row.empName} ${row.dateStr}: ${error.message}`);attSkip++;}
+      else attNew++;
     }
-
-    const rec={employee_id:emp.id,work_date:row.dateStr,check_in,check_out,
-      shift_id:shift?.id||emp.shift_id||null,branch_id:branch?.id||emp.branch_id||null,
-      is_late,late_minutes:is_late?late_minutes:0,note:row.note||null,source:'excel_import'};
-
-    // upsert (ถ้ามีแล้วจะ update)
-    const{error}=await db.from('attendance').upsert(rec,{onConflict:'employee_id,work_date',ignoreDuplicates:false});
-    if(error){errors.push(`${row.empName} ${row.dateStr}: ${error.message}`);attSkip++;}
-    else attOk++;
   }
 
   // นำเข้าวันลา
@@ -2602,7 +2643,7 @@ async function doImport(){
   document.getElementById('import-result-icon').textContent=hasErr?'⚠️':'✅';
   document.getElementById('import-result-title').textContent=hasErr?'นำเข้าเสร็จสิ้น (มีบางรายการข้าม)':'นำเข้าสำเร็จทั้งหมด!';
   document.getElementById('import-result-sub').innerHTML=
-    `ลงเวลา: นำเข้า <b>${attOk}</b> รายการ${attSkip?` (ข้าม ${attSkip})`:''}` +
+    `ลงเวลา: เพิ่มใหม่ <b>${attNew}</b>${attFill?` · เติมช่องว่าง <b>${attFill}</b>`:''}${attSkip?` · ข้าม ${attSkip}`:''} รายการ` +
     `<br>วันลา: นำเข้า <b>${lvOk}</b> รายการ${lvSkip?` (ข้าม ${lvSkip})`:''}` +
     (errors.length?`<br><span style="color:#E53935;font-size:10px">${errors.slice(0,3).join('<br>')}${errors.length>3?`<br>...อีก ${errors.length-3} ข้อผิดพลาด`:''}</span>`:'');
 }
