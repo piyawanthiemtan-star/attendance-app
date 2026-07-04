@@ -2462,13 +2462,16 @@ function resetImport(){
 // แปลงค่าจาก Excel (serial number / Date / text) → date "YYYY-MM-DD" และ time "HH:MM" โดยไม่มีปัญหา timezone
 function xlsxDate(v){
   if(v==null||v==='')return'';
-  const ok=d=>d&&d.y>=1970&&d.m>=1&&d.m<=12&&d.d>=1&&d.d<=31;  // กันวันที่ผี เช่น 1900-01-00
-  const fmt=d=>`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
-  if(v instanceof Date)return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
-  if(typeof v==='number'){if(v<1)return'';const d=XLSX.SSF.parse_date_code(v);return ok(d)?fmt(d):'';}
+  const build=(y,m,d)=>{
+    if(y>=2400)y-=543;                          // ปี พ.ศ. -> ค.ศ. (กันคนกรอกปีไทย เช่น 2569)
+    if(y<1970||m<1||m>12||d<1||d>31)return'';   // กันวันที่ผี/นอกช่วง เช่น 1900-01-00
+    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  };
+  if(v instanceof Date)return build(v.getFullYear(),v.getMonth()+1,v.getDate());
+  if(typeof v==='number'){if(v<1)return'';const d=XLSX.SSF.parse_date_code(v);return d?build(d.y,d.m,d.d):'';}
   const s=String(v).trim();
-  if(s.match(/^\d{4}-\d{2}-\d{2}/)){const[,mm,dd]=s.substring(0,10).split('-');return(+mm>=1&&+dd>=1)?s.substring(0,10):'';}
-  const d=XLSX.SSF.parse_date_code(s);return ok(d)?fmt(d):'';
+  if(s.match(/^\d{4}-\d{2}-\d{2}/)){const[yy,mm,dd]=s.substring(0,10).split('-').map(Number);return build(yy,mm,dd);}
+  const d=XLSX.SSF.parse_date_code(s);return d?build(d.y,d.m,d.d):'';
 }
 function xlsxTime(v){
   if(v==null||v==='')return'';
