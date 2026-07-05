@@ -262,7 +262,7 @@ async function loadReport(){
 
       if(lv){
         status='leave';empLeave++;totLeave++;
-        const typeMap={sick:'ลาป่วย',personal:'ลากิจ',vacation:'ลาพักร้อน'};
+        const typeMap={sick:'ลาป่วย',personal:'ลากิจ',vacation:'ลาพักร้อน',unpaid:'ลาหักเงิน'};
         note=typeMap[lv.leave_type]||lv.leave_type;
       } else if(att?.check_in){
         empDays++;totDays++;

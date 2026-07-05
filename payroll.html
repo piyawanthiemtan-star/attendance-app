@@ -399,7 +399,8 @@ async function loadSummary(){
     const base=cfg?.base_salary||0;
     const empAtts=(atts||[]).filter(a=>a.employee_id===emp.id&&a.check_in);
     const workDays=empAtts.length;
-    const proratedBase=Math.round(base*(workDays/30)*100)/100;
+    const unpaidDays=(leaves||[]).filter(l=>l.employee_id===emp.id&&l.leave_type==='unpaid').reduce((s,l)=>s+(l.days||0),0);
+    const proratedBase=Math.round((base-base/30*unpaidDays)*100)/100;
     const posPay=cfg?.position_pay||0;
     const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
     const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
@@ -461,7 +462,8 @@ async function showPayslip(empId,ym){
 
   const base=cfg?.base_salary||0;
   const workDays=(atts||[]).filter(a=>a.check_in).length;
-  const proratedBase=Math.round(base*(workDays/30)*100)/100;
+  const unpaidDays=(leaves||[]).filter(l=>l.leave_type==='unpaid').reduce((s,l)=>s+(l.days||0),0);
+  const proratedBase=Math.round((base-base/30*unpaidDays)*100)/100;
   const posPay=cfg?.position_pay||0;
   const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
   const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
@@ -482,7 +484,7 @@ async function showPayslip(empId,ym){
     <div style="font-size:11px;color:var(--text3);margin-bottom:10px">เงินเดือน ${thaiM(ym)} · มาทำงาน ${workDays} วัน · สาย ${lateCount} ครั้ง</div>
     <table class="ps">
       <tr class="section"><td colspan="2">รายรับ</td></tr>
-      <tr><td>เงินเดือนพื้นฐาน (${workDays}/30 วัน)</td><td>฿${fmt(proratedBase)}</td></tr>
+      <tr><td>เงินเดือน${unpaidDays?` (หักลา ${unpaidDays} วัน)`:''}</td><td>฿${fmt(proratedBase)}</td></tr>
       ${posPay?`<tr><td>ค่าตำแหน่ง</td><td>฿${fmt(posPay)}</td></tr>`:''}
       ${licensePay?`<tr><td>สวัสดิการค่าใบขับขี่</td><td>฿${fmt(licensePay)}</td></tr>`:''}
       ${comm?`<tr><td>ค่าคอมมิชชั่น</td><td>฿${fmt(comm)}</td></tr>`:''}
@@ -582,7 +584,8 @@ async function calcAndSaveItems(run){
     const base=cfg?.base_salary||0;
     const empAtts=(atts||[]).filter(a=>a.employee_id===emp.id&&a.check_in);
     const workDays=empAtts.length;
-    const proratedBase=Math.round(base*(workDays/30)*100)/100;
+    const unpaidDays=(leaves||[]).filter(l=>l.employee_id===emp.id&&l.leave_type==='unpaid').reduce((s,l)=>s+(l.days||0),0);
+    const proratedBase=Math.round((base-base/30*unpaidDays)*100)/100;
     const posPay=cfg?.position_pay||0;
     const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
     const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;

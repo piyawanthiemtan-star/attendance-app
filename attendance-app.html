@@ -653,6 +653,10 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         <div style="font-size:20px">🌴</div><div><div style="font-weight:600">ลาพักร้อน</div><div style="font-size:11px;color:var(--text3)">คงเหลือ <span id="lt-vacation">3</span> วัน</div></div>
         <div class="leave-type-radio"></div>
       </div>
+      <div class="leave-type-opt" onclick="selectLeaveType('unpaid',this)">
+        <div style="font-size:20px">💸</div><div><div style="font-weight:600">ลาหักเงิน</div><div style="font-size:11px;color:var(--text3)">หักเงินเดือนวันละ (ฐาน/30)</div></div>
+        <div class="leave-type-radio"></div>
+      </div>
     </div>
     <div class="date-row">
       <div class="date-box"><label>วันที่เริ่มลา</label><input type="date" id="leave-from" onchange="updateDays()"></div>
@@ -832,6 +836,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <option value="sick">🏥 ลาป่วย</option>
       <option value="personal">📋 ลากิจ</option>
       <option value="vacation">🌴 ลาพักร้อน</option>
+      <option value="unpaid">💸 ลาหักเงิน</option>
     </select>
     <label class="modal-label">วันที่เริ่ม</label>
     <input type="date" class="modal-input" id="edl-from">
@@ -970,7 +975,7 @@ let user=null,todayAtt=null,selLeaveId=null,selLeaveType='sick';
 let allEmps=[],allShifts=[],allBranches=[],bonusCfg=null;
 let clockTick=null,gpsCached=null;
 const QUOTAS={sick:30,personal:6,vacation:3};
-const LLABELS={sick:'🏥 ลาป่วย',personal:'📋 ลากิจ',vacation:'🌴 ลาพักร้อน'};
+const LLABELS={sick:'🏥 ลาป่วย',personal:'📋 ลากิจ',vacation:'🌴 ลาพักร้อน',unpaid:'💸 ลาหักเงิน'};
 const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
 
 function toast(msg,color='#1A1A2E'){
@@ -2689,16 +2694,18 @@ async function loadMyPayslip(){
 
   document.getElementById('my-payslip-content').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">กำลังโหลด...</div>';
 
-  const[{data:cfg,error:cfgErr},{data:atts}]=await Promise.all([
+  const[{data:cfg,error:cfgErr},{data:atts},{data:unpaidLv}]=await Promise.all([
     db.from('employee_salary').select('*').eq('employee_id',user.id).maybeSingle(),
-    db.from('attendance').select('*').eq('employee_id',user.id).gte('work_date',start).lte('work_date',end)
+    db.from('attendance').select('*').eq('employee_id',user.id).gte('work_date',start).lte('work_date',end),
+    db.from('leave_requests').select('days').eq('employee_id',user.id).eq('status','approved').eq('leave_type','unpaid').gte('start_date',start).lte('end_date',end)
   ]);
   if(cfgErr){document.getElementById('my-payslip-content').innerHTML=`<div style="text-align:center;padding:24px;color:#E53935">เกิดข้อผิดพลาด: ${cfgErr.message}</div>`;return;}
 
   const base=cfg?.base_salary||0;
   const workDays=(atts||[]).filter(a=>a.check_in).length;
   const lateCount=(atts||[]).filter(a=>attIsLate(a,user.shift_id)).length;
-  const proratedBase=Math.round(base*(workDays/30)*100)/100;
+  const unpaidDays=(unpaidLv||[]).reduce((s,l)=>s+(l.days||0),0);
+  const proratedBase=Math.round((base-base/30*unpaidDays)*100)/100;
   const posPay=cfg?.position_pay||0;
   const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
   const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
@@ -2727,7 +2734,7 @@ async function loadMyPayslip(){
     <div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-align:center">มา ${workDays} วัน · สาย ${lateCount} ครั้ง${otMins?` · OT ${(otMins/60).toFixed(1)} ชม.`:''}</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <tr style="background:#F0FBF8"><td colspan="2" style="padding:6px 10px;font-weight:700;color:#0D7A65;font-size:11px">รายรับ</td></tr>
-      <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">เงินเดือน (${workDays}/30 วัน)</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(proratedBase)}</td></tr>
+      <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">เงินเดือน${unpaidDays?` (หักลา ${unpaidDays} วัน)`:''}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(proratedBase)}</td></tr>
       ${posPay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่าตำแหน่ง</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(posPay)}</td></tr>`:''}
       ${licensePay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่าใบขับขี่</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(licensePay)}</td></tr>`:''}
       ${comm?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่าคอมมิชชั่น</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(comm)}</td></tr>`:''}
