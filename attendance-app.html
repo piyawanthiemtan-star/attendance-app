@@ -529,6 +529,11 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
           <div class="admin-item-info"><div class="admin-item-label">นำเข้าข้อมูล Excel</div><div class="admin-item-sub">Import Template LSMG รายเดือน</div></div>
           <div class="admin-item-arrow">›</div>
         </button>
+        <button class="admin-item" onclick="openDeviceAlerts()" id="admin-device-btn">
+          <div class="admin-item-icon" style="background:#FCE4EC;font-size:22px">🔒</div>
+          <div class="admin-item-info"><div class="admin-item-label">แจ้งเตือนอุปกรณ์</div><div class="admin-item-sub" id="device-alert-sub">ยังไม่มีแจ้งเตือน</div></div>
+          <div class="admin-item-arrow">›</div>
+        </button>
       </div>
 
       <div class="admin-section">
@@ -754,7 +759,18 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <option value="owner">👑 เจ้าของกิจการ</option>
     </select>
     <div id="empf-role-hint" style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.5;padding:8px 10px;background:var(--gray);border-radius:8px"></div>
+    <div id="empf-device-section" style="display:none;margin-top:10px;padding:10px 12px;background:#F3E5F5;border-radius:8px">
+      <div style="font-size:11px;font-weight:700;color:#4A148C;margin-bottom:4px">🔒 อุปกรณ์ที่ลงทะเบียน</div>
+      <div id="empf-device-info" style="font-size:12px;color:#6A1B9A"></div>
+      <button type="button" style="margin-top:8px;padding:6px 14px;font-size:12px;font-weight:600;border:1px solid #E53935;color:#E53935;background:#fff;border-radius:8px;cursor:pointer" onclick="resetDevice()">🔄 รีเซ็ตอุปกรณ์</button>
+    </div>
+    <div id="empf-resigned-banner" style="display:none;background:#FCE4EC;border:1px solid #E53935;border-radius:8px;padding:10px 12px;margin-top:10px">
+      <div style="font-size:12px;font-weight:700;color:#C62828">⛔ พนักงานลาออกแล้ว</div>
+      <div id="empf-resigned-date" style="font-size:11px;color:#E53935;margin-top:2px"></div>
+      <button type="button" style="margin-top:8px;padding:6px 14px;font-size:12px;font-weight:600;border:1px solid var(--teal);color:var(--teal);background:#fff;border-radius:8px;cursor:pointer" onclick="restoreEmp()">🔄 คืนสถานะพนักงาน</button>
+    </div>
     <button class="btn-primary" onclick="saveEmp()">💾 บันทึก</button>
+    <button class="btn-secondary" id="empf-resign" onclick="resignEmp()" style="display:none;background:#FCE4EC;color:#C62828;border:1px solid #E53935">⛔ บันทึกลาออก</button>
     <button class="btn-secondary" id="empf-delete" onclick="deleteEmp()" style="display:none">🗑 ลบพนักงานคนนี้</button>
   </div>
 </div>
@@ -963,6 +979,19 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
   </div>
 </div>
 
+<!-- MODAL: แจ้งเตือนอุปกรณ์ -->
+<div class="modal-overlay" id="modal-device-alerts">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title"><span>🔒 แจ้งเตือนอุปกรณ์ผิดปกติ</span> <button class="modal-close" onclick="closeModal('modal-device-alerts')">✕</button></div>
+    <div style="background:#FFF8E1;border:1px solid #F9A825;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#E65100">
+      รายการด้านล่างคือพนักงานที่พยายามเข้าระบบจากอุปกรณ์ที่ไม่ใช่เครื่องที่ลงทะเบียน<br>หากพนักงานเปลี่ยนเครื่องใหม่ ให้กด "รีเซ็ตอุปกรณ์" ในหน้าแก้ไขพนักงาน
+    </div>
+    <div id="device-alert-list"><div class="loading-text">กำลังโหลด...</div></div>
+    <button class="btn-secondary" onclick="closeModal('modal-device-alerts')" style="margin-top:10px">ปิด</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1000,6 +1029,8 @@ function monthStr(d){const dt=d||new Date();return dt.getFullYear()+'-'+(dt.getM
 function thaiM(ym){const[y,m]=ym.split('-');const ms=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return ms[parseInt(m)]+' '+(parseInt(y)+543);}
 // เบี้ยขยันเริ่มใช้ เม.ย. 2569 (เดือนก่อนหน้าไม่ได้รับเบี้ยขยันทุกคน)
 const BONUS_START_YM='2026-04';
+function getDeviceId(){let d=localStorage.getItem('lsmg_device_id');if(!d){d=crypto.randomUUID();localStorage.setItem('lsmg_device_id',d);}return d;}
+function getDeviceName(){const u=navigator.userAgent;if(/iPhone/.test(u))return'iPhone';if(/iPad/.test(u))return'iPad';if(/Android/.test(u))return'Android';if(/Windows/.test(u))return'Windows PC';if(/Mac/.test(u))return'Mac';return'Unknown';}
 // คำนวณนาทีสาย ยึด "กะที่บันทึกในระเบียนวันนั้น" (a.shift_id) รองรับการเลือกกะรายวัน
 // ถ้าระเบียนไม่มี shift_id ค่อย fallback ไปกะปัจจุบันของพนักงาน
 function attLateMin(a,empShiftId){
@@ -1018,9 +1049,10 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 
 // AUTH
 async function initLogin(){
-  const{data}=await db.from('employees').select('id,name,role').order('name');
+  const{data}=await db.from('employees').select('id,name,role,status').order('name');
   const sel=document.getElementById('login-emp');
   (data||[]).forEach(e=>{
+    if(e.status==='resigned')return;
     const o=document.createElement('option');
     o.value=e.id;
     const roleLabel=e.role==='owner'?' 👑':e.role==='hr'?' 👩‍💼':'';
@@ -1034,6 +1066,21 @@ async function doLogin(){
   if(!id||!pin){toast('กรุณาเลือกชื่อและใส่ PIN');return;}
   const{data}=await db.from('employees').select('*').eq('id',id).eq('pin',pin).single();
   if(!data){document.getElementById('login-err').style.display='block';return;}
+  if(data.status==='resigned'){
+    document.getElementById('login-err').textContent='⚠️ บัญชีนี้ถูกระงับ (พนักงานลาออก)';
+    document.getElementById('login-err').style.display='block';return;
+  }
+  const did=getDeviceId(),dname=getDeviceName();
+  if(data.role==='employee'){
+    if(!data.device_id){
+      await db.from('employees').update({device_id:did,device_name:dname}).eq('id',id);
+      data.device_id=did;data.device_name=dname;
+    } else if(data.device_id!==did){
+      await db.from('device_alerts').insert({employee_id:id,device_id:did,device_name:dname,alert_type:'device_mismatch'});
+      document.getElementById('login-err').textContent='⚠️ ไม่สามารถเข้าจากอุปกรณ์นี้ได้ กรุณาใช้เครื่องที่ลงทะเบียนไว้';
+      document.getElementById('login-err').style.display='block';return;
+    }
+  }
   user=data;
   document.getElementById('login-err').style.display='none';
   document.getElementById('screen-login').classList.remove('active');
@@ -1072,7 +1119,8 @@ async function initApp(){
   document.getElementById('leave-from').value=todayStr();
   document.getElementById('leave-to').value=todayStr();
   loadTodayAtt();loadHome();loadLeave();loadBonus();
-  if(user.role==='hr'||user.role==='owner'){loadAdminSummary();loadApproveCount();}
+  if(user.role==='hr'||user.role==='owner'){loadAdminSummary();loadApproveCount();loadAlertCount();}
+  if(user.role==='owner')cleanupResigned();
   checkGPS();
   applyRoleAccess();
 }
@@ -1809,10 +1857,11 @@ async function loadEmpList(){
     const shift=allShifts.find(x=>x.id===e.shift_id);
     const br=allBranches.find(x=>x.id===e.branch_id);
     const[bg,tx]=AV[i%5];
-    return`<div class="emp-report-row" onclick="openEmpForm('${e.id}')" style="cursor:pointer">
+    const isResigned=e.status==='resigned';
+    return`<div class="emp-report-row" onclick="openEmpForm('${e.id}')" style="cursor:pointer;${isResigned?'opacity:.5':''}">
       <div class="emp-av" style="background:${bg};color:${tx};overflow:hidden;">${e.photo_url?`<img src="${e.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.textContent='${e.name.substring(0,2)}'">`:e.name.substring(0,2)}</div>
-      <div class="emp-ri"><div class="emp-rname">${e.name}</div><div class="emp-rsub">${e.department||''} · ${shift?shift.shift_name:'ไม่มีกะ'} · ${br?br.name:'ไม่มีสาขา'}</div></div>
-      <span class="emp-rbadge ${e.role==='owner'?'badge-absent':e.role==='hr'?'badge-ok':'badge-leave'}">${e.role==='owner'?'👑 เจ้าของ':e.role==='hr'?'👩‍💼 HR':'👤 พนักงาน'}</span>
+      <div class="emp-ri"><div class="emp-rname">${e.name}${isResigned?' <span style="font-size:10px;color:#E53935">⛔ ลาออก</span>':''}</div><div class="emp-rsub">${e.department||''} · ${shift?shift.shift_name:'ไม่มีกะ'} · ${br?br.name:'ไม่มีสาขา'}</div></div>
+      <span class="emp-rbadge ${isResigned?'badge-absent':e.role==='owner'?'badge-absent':e.role==='hr'?'badge-ok':'badge-leave'}">${isResigned?'⛔ ลาออก':e.role==='owner'?'👑 เจ้าของ':e.role==='hr'?'👩‍💼 HR':'👤 พนักงาน'}</span>
     </div>`;
   }).join('');
 }
@@ -1845,6 +1894,24 @@ function openEmpForm(id){
     nm.textContent='';
     if(e.photo_url){prev.src=e.photo_url;prev.style.display='block';ph.style.display='none';}
     else{prev.style.display='none';ph.style.display='block';}
+    const devSec=document.getElementById('empf-device-section');
+    if(e.device_id){
+      devSec.style.display='block';
+      document.getElementById('empf-device-info').textContent=`${e.device_name||'Unknown'} · ลงทะเบียนแล้ว`;
+    } else {
+      devSec.style.display='block';
+      document.getElementById('empf-device-info').textContent='ยังไม่มีอุปกรณ์ลงทะเบียน (จะลงทะเบียนอัตโนมัติเมื่อ login ครั้งแรก)';
+    }
+    const resignBtn=document.getElementById('empf-resign');
+    const resignBanner=document.getElementById('empf-resigned-banner');
+    if(e.status==='resigned'){
+      resignBtn.style.display='none';
+      resignBanner.style.display='block';
+      document.getElementById('empf-resigned-date').textContent='ลาออกเมื่อ '+fmtDate(e.resigned_at);
+    } else {
+      resignBanner.style.display='none';
+      resignBtn.style.display=user._canDeleteEmp?'block':'none';
+    }
   } else {
     document.getElementById('empf-title').textContent='เพิ่มพนักงานใหม่';
     ['empf-id','empf-name','empf-phone','empf-address','empf-position','empf-pin','empf-startdate','empf-bankno','empf-banknote'].forEach(x=>document.getElementById(x).value='');
@@ -1858,6 +1925,9 @@ function openEmpForm(id){
     document.getElementById('empf-photo-preview').src='';
     document.getElementById('empf-photo-placeholder').style.display='block';
     document.getElementById('empf-photo-name').textContent='';
+    document.getElementById('empf-device-section').style.display='none';
+    document.getElementById('empf-resign').style.display='none';
+    document.getElementById('empf-resigned-banner').style.display='none';
   }
   updateRoleHint();
   openModal('modal-emp-form');
@@ -1925,6 +1995,92 @@ async function deleteEmp(){
   closeModal('modal-emp-form');
   toast('🗑 ลบ "'+name+'" ออกจากระบบแล้ว','#E53935');
   loadEmpList();
+}
+
+// RESIGN / RESTORE
+async function resignEmp(){
+  const id=document.getElementById('empf-id').value;
+  const emp=allEmps.find(e=>e.id===id);if(!emp)return;
+  if(!confirm(`บันทึก "${emp.name}" ลาออก?\n\nพนักงานจะเข้าระบบไม่ได้ทันที\nข้อมูลจะถูกเก็บไว้ 30 วันแล้วลบอัตโนมัติ`))return;
+  const{error}=await db.from('employees').update({status:'resigned',resigned_at:todayStr()}).eq('id',id);
+  if(error){toast('Error: '+error.message,'#E53935');return;}
+  emp.status='resigned';emp.resigned_at=todayStr();
+  closeModal('modal-emp-form');
+  toast('⛔ บันทึกลาออกแล้ว — ข้อมูลจะเก็บ 30 วัน','#E53935');
+  loadEmpList();
+}
+
+async function restoreEmp(){
+  const id=document.getElementById('empf-id').value;
+  const emp=allEmps.find(e=>e.id===id);if(!emp)return;
+  if(!confirm(`คืนสถานะ "${emp.name}" เป็นพนักงานปกติ?`))return;
+  const{error}=await db.from('employees').update({status:'active',resigned_at:null}).eq('id',id);
+  if(error){toast('Error: '+error.message,'#E53935');return;}
+  emp.status='active';emp.resigned_at=null;
+  closeModal('modal-emp-form');
+  toast('✅ คืนสถานะพนักงานแล้ว','#0B9E82');
+  loadEmpList();
+}
+
+async function cleanupResigned(){
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);
+  const cutStr=dateStr(cutoff);
+  const{data:old}=await db.from('employees').select('id,name').eq('status','resigned').lte('resigned_at',cutStr);
+  if(!old||!old.length)return;
+  for(const emp of old){
+    await db.from('attendance').delete().eq('employee_id',emp.id);
+    await db.from('leave_requests').delete().eq('employee_id',emp.id);
+    await db.from('attendance_bonus').delete().eq('employee_id',emp.id);
+    await db.from('employee_salary').delete().eq('employee_id',emp.id);
+    await db.from('device_alerts').delete().eq('employee_id',emp.id);
+    await db.from('employees').delete().eq('id',emp.id);
+  }
+  toast(`🗑 ลบข้อมูลพนักงานลาออกครบ 30 วัน (${old.length} คน)`,'#E53935');
+}
+
+// DEVICE LOCK
+async function resetDevice(){
+  const id=document.getElementById('empf-id').value;
+  const emp=allEmps.find(e=>e.id===id);if(!emp)return;
+  if(!confirm(`รีเซ็ตอุปกรณ์ของ "${emp.name}"?\n\nพนักงานจะต้องเข้าระบบใหม่เพื่อลงทะเบียนเครื่องใหม่`))return;
+  const{error}=await db.from('employees').update({device_id:null,device_name:null}).eq('id',id);
+  if(error){toast('รีเซ็ตไม่ได้: '+error.message,'#E53935');return;}
+  emp.device_id=null;emp.device_name=null;
+  document.getElementById('empf-device-info').textContent='ยังไม่มีอุปกรณ์ลงทะเบียน (จะลงทะเบียนอัตโนมัติเมื่อ login ครั้งแรก)';
+  toast('✅ รีเซ็ตอุปกรณ์แล้ว พนักงานสามารถ login จากเครื่องใหม่ได้','#0B9E82');
+}
+
+async function openDeviceAlerts(){
+  openModal('modal-device-alerts');
+  const{data,error}=await db.from('device_alerts').select('*,employees(name)').order('created_at',{ascending:false}).limit(50);
+  const el=document.getElementById('device-alert-list');
+  if(error){el.innerHTML=`<div style="color:#E53935;padding:12px">โหลดไม่ได้: ${error.message}</div>`;return;}
+  if(!data||!data.length){el.innerHTML='<div class="loading-text">ไม่มีแจ้งเตือน</div>';return;}
+  el.innerHTML=data.map(a=>{
+    const name=a.employees?.name||'ไม่ทราบ';
+    const dt=new Date(a.created_at);
+    const ts=`${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()+543} ${dt.getHours().toString().padStart(2,'0')}:${dt.getMinutes().toString().padStart(2,'0')}`;
+    return`<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:13px">${a.resolved?'':'⚠️ '}${name}</div>
+        <div style="font-size:11px;color:var(--text3)">พยายาม login จาก ${a.device_name||'Unknown'} · ${ts}</div>
+      </div>
+      ${a.resolved?'<span class="badge badge-paid" style="font-size:10px">✅ จัดการแล้ว</span>':`<button style="padding:5px 10px;font-size:11px;border:1px solid var(--teal);color:var(--teal);background:#fff;border-radius:8px;cursor:pointer" onclick="resolveAlert('${a.id}',this)">รับทราบ</button>`}
+    </div>`;
+  }).join('');
+}
+
+async function resolveAlert(id,btn){
+  const{error}=await db.from('device_alerts').update({resolved:true}).eq('id',id);
+  if(error){toast('Error: '+error.message,'#E53935');return;}
+  btn.outerHTML='<span class="badge badge-paid" style="font-size:10px">✅ จัดการแล้ว</span>';
+  loadAlertCount();
+}
+
+async function loadAlertCount(){
+  const{count}=await db.from('device_alerts').select('*',{count:'exact',head:true}).eq('resolved',false);
+  const sub=document.getElementById('device-alert-sub');
+  if(sub)sub.textContent=count?`⚠️ มี ${count} แจ้งเตือนใหม่`:'ไม่มีแจ้งเตือน';
 }
 
 // BRANCH MANAGEMENT
@@ -2663,6 +2819,7 @@ async function doImport(){
 document.getElementById('modal-shift').addEventListener('click',function(e){if(e.target===this)closeModal('modal-shift');});
 document.getElementById('modal-shift-form').addEventListener('click',function(e){if(e.target===this)closeModal('modal-shift-form');});
 document.getElementById('modal-import').addEventListener('click',function(e){if(e.target===this)closeModal('modal-import');});
+document.getElementById('modal-device-alerts').addEventListener('click',function(e){if(e.target===this)closeModal('modal-device-alerts');});
 
 // patch openModal to load shift list
 const _origOpen2=window.openModal;
