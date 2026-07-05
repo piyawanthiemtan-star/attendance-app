@@ -2689,10 +2689,9 @@ async function loadMyPayslip(){
 
   document.getElementById('my-payslip-content').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">กำลังโหลด...</div>';
 
-  const[{data:cfg,error:cfgErr},{data:atts},{data:advances}]=await Promise.all([
+  const[{data:cfg,error:cfgErr},{data:atts}]=await Promise.all([
     db.from('employee_salary').select('*').eq('employee_id',user.id).maybeSingle(),
-    db.from('attendance').select('*').eq('employee_id',user.id).gte('work_date',start).lte('work_date',end),
-    db.from('salary_advances').select('*').eq('employee_id',user.id).eq('year_month',ym).eq('status','approved')
+    db.from('attendance').select('*').eq('employee_id',user.id).gte('work_date',start).lte('work_date',end)
   ]);
   if(cfgErr){document.getElementById('my-payslip-content').innerHTML=`<div style="text-align:center;padding:24px;color:#E53935">เกิดข้อผิดพลาด: ${cfgErr.message}</div>`;return;}
 
@@ -2705,14 +2704,14 @@ async function loadMyPayslip(){
   const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
   const otherPay=cfg?.other_pay||0;
   const otherDesc=cfg?.other_desc||'เงินเพิ่มอื่นๆ';
-  const otherDeduct=cfg?.other_deduct||0;
-  const otherDeductDesc=cfg?.other_deduct_desc||'หักอื่นๆ';
+  const d1=cfg?.other_deduct||0, d1n=cfg?.other_deduct_desc||'รายการหัก 1';
+  const d2=cfg?.other_deduct2||0, d2n=cfg?.other_deduct2_desc||'รายการหัก 2';
+  const d3=cfg?.other_deduct3||0, d3n=cfg?.other_deduct3_desc||'รายการหัก 3';
+  const totalDeduct=d1+d2+d3;
   const otMins=(atts||[]).reduce((s,a)=>s+(a.ot_minutes||0),0);
   const otPay=Math.round(otMins/60*(base/30/8)*1.5*100)/100;
   const gross=proratedBase+posPay+licensePay+comm+otherPay+otPay;
-  const ss=Math.min(Math.min(base,7000)*0.05,350);
-  const advTotal=(advances||[]).reduce((s,a)=>s+(a.amount||0),0);
-  const net=gross-ss-otherDeduct-advTotal;
+  const net=gross-totalDeduct;
 
   if(!cfg){
     document.getElementById('my-payslip-content').innerHTML='<div style="text-align:center;padding:24px;color:var(--text3)">ยังไม่ได้กำหนดเงินเดือน<br>กรุณาติดต่อ HR</div>';
@@ -2735,9 +2734,10 @@ async function loadMyPayslip(){
       ${otherPay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${otherDesc}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(otherPay)}</td></tr>`:''}
       ${otPay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่า OT</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(otPay)}</td></tr>`:''}
       <tr style="background:#F0FBF8"><td colspan="2" style="padding:6px 10px;font-weight:700;color:#0D7A65;font-size:11px">รายหัก</td></tr>
-      <tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ประกันสังคม</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(ss)})</td></tr>
-      ${otherDeduct?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${otherDeductDesc}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(otherDeduct)})</td></tr>`:''}
-      ${advTotal?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">เงินเบิกล่วงหน้า</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(advTotal)})</td></tr>`:''}
+      ${d1?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${d1n}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(d1)})</td></tr>`:''}
+      ${d2?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${d2n}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(d2)})</td></tr>`:''}
+      ${d3?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${d3n}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(d3)})</td></tr>`:''}
+      ${totalDeduct?'':`<tr><td colspan="2" style="padding:6px 10px;color:var(--text3);font-size:11px">— ไม่มีรายการหัก —</td></tr>`}
     </table>`;
 }
 </script>

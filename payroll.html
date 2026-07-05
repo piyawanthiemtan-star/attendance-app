@@ -109,7 +109,7 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
     <div class="sum-box"><div class="sum-num" id="sg-emp" style="color:var(--teal)">–</div><div class="sum-lbl">พนักงาน</div></div>
     <div class="sum-box"><div class="sum-num" id="sg-gross" style="color:var(--green)">–</div><div class="sum-lbl">ค่าใช้จ่ายรวม</div></div>
     <div class="sum-box"><div class="sum-num" id="sg-net" style="color:var(--teal)">–</div><div class="sum-lbl">โอนสุทธิ</div></div>
-    <div class="sum-box"><div class="sum-num" id="sg-ss" style="color:var(--orange)">–</div><div class="sum-lbl">ประกันสังคมรวม</div></div>
+    <div class="sum-box"><div class="sum-num" id="sg-ss" style="color:var(--orange)">–</div><div class="sum-lbl">หักรวม</div></div>
     <div class="sum-box"><div class="sum-num" id="sg-ot" style="color:var(--blue)">–</div><div class="sum-lbl">OT รวม</div></div>
   </div>
   <div class="card">
@@ -222,10 +222,31 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
     <label class="modal-label" id="ms-other-label" style="display:none;font-size:11px;color:var(--text3)">ระบุรายละเอียด</label>
     <input class="modal-input" id="ms-other-desc" placeholder="เช่น ค่าน้ำมัน" style="display:none">
     <div style="height:1px;background:var(--border);margin:14px 0"></div>
-    <label class="modal-label">รายการหักอื่นๆ (บาท/เดือน)</label>
-    <input type="number" class="modal-input" id="ms-deduct" placeholder="0 — เช่น ค่าเครื่องแบบ ค่าประกันอุบัติเหตุ ฯลฯ" min="0" oninput="toggleDeductDesc()">
-    <label class="modal-label" id="ms-deduct-label" style="display:none;font-size:11px;color:var(--text3)">ระบุรายละเอียด</label>
-    <input class="modal-input" id="ms-deduct-desc" placeholder="เช่น ค่าเครื่องแบบ" style="display:none">
+    <label class="modal-label">รายการหัก (บาท/เดือน) — หักรอบสิ้นเดือน</label>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <select class="modal-input" id="ms-deduct-desc" style="flex:1.5;margin:0">
+        <option value="">— เลือกประเภทหัก 1 —</option>
+        <option>ประกันสังคม</option>
+        <option>เบิกจ่ายล่วงหน้า</option>
+        <option>เงินกู้ / เงินยืม</option>
+        <option>ค่าชุดฟอร์ม</option>
+        <option>ค่าเสียหาย / สินค้าชำรุด</option>
+        <option>กองทุนสำรองเลี้ยงชีพ</option>
+        <option>เงินค้ำประกัน</option>
+        <option>ค่าที่พัก / น้ำ-ไฟ</option>
+        <option>ค่าปรับมาสาย / ขาดงาน</option>
+        <option>อื่นๆ</option>
+      </select>
+      <input type="number" class="modal-input" id="ms-deduct" placeholder="0" min="0" style="flex:1;margin:0">
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input class="modal-input" id="ms-deduct2-desc" placeholder="รายการหัก 2 (อื่นๆ)" style="flex:1.5;margin:0">
+      <input type="number" class="modal-input" id="ms-deduct2" placeholder="0" min="0" style="flex:1;margin:0">
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input class="modal-input" id="ms-deduct3-desc" placeholder="รายการหัก 3 (อื่นๆ)" style="flex:1.5;margin:0">
+      <input type="number" class="modal-input" id="ms-deduct3" placeholder="0" min="0" style="flex:1;margin:0">
+    </div>
     <label class="modal-label">หมายเหตุ</label>
     <input class="modal-input" id="ms-note" placeholder="(ถ้ามี)">
     <button class="btn-primary" onclick="saveSalaryConfig()">💾 บันทึก</button>
@@ -370,7 +391,7 @@ async function loadSummary(){
   // วันทำงานในเดือน (จ-ศ)
   const wdCount=countWorkDays(new Date(start),new Date(end));
 
-  let totalGross=0,totalNet=0,totalSS=0,totalOT=0;
+  let totalGross=0,totalNet=0,totalDed=0,totalOT=0;
   // ถ้าไม่ใช่ owner แสดงเฉพาะพนักงานตัวเอง
   const visibleEmps=isOwner?allEmps:allEmps.filter(e=>e.id===currentUser?.id);
   const html=visibleEmps.map((emp,i)=>{
@@ -383,14 +404,13 @@ async function loadSummary(){
     const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
     const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
     const otherPay=cfg?.other_pay||0;
-    const otherDeduct=cfg?.other_deduct||0;
+    const totalDeduct=(cfg?.other_deduct||0)+(cfg?.other_deduct2||0)+(cfg?.other_deduct3||0);
     const lateCount=(empAtts.filter(a=>a.is_late)||[]).length;
     const otMins=(empAtts||[]).reduce((s,a)=>s+(a.ot_minutes||0),0);
     const otPay=Math.round(otMins/60*base/30/8*1.5*100)/100;
     const gross=proratedBase+posPay+licensePay+comm+otherPay+otPay;
-    const ss=Math.min(Math.min(base,7000)*0.05,350);
-    const net=gross-ss-otherDeduct;
-    if(isOwner){totalGross+=gross;totalNet+=net;totalSS+=ss;totalOT+=otPay;}
+    const net=gross-totalDeduct;
+    if(isOwner){totalGross+=gross;totalNet+=net;totalDed+=totalDeduct;totalOT+=otPay;}
     const[bg,tx]=AV[i%5];
     // ถ้าไม่ใช่ owner ซ่อนตัวเลขในรายการรวม แต่คลิกดูสลิปตัวเองได้
     const canClick=isOwner||emp.id===currentUser?.id;
@@ -411,7 +431,7 @@ async function loadSummary(){
     document.getElementById('sg-emp').textContent=allEmps.length;
     document.getElementById('sg-gross').textContent='฿'+fmt(totalGross);
     document.getElementById('sg-net').textContent='฿'+fmt(totalNet);
-    document.getElementById('sg-ss').textContent='฿'+fmt(totalSS);
+    document.getElementById('sg-ss').textContent='฿'+fmt(totalDed);
     document.getElementById('sg-ot').textContent='฿'+fmt(totalOT);
   } else {
     // พนักงานเห็นแค่ชื่อตัวเองในรายการ ไม่เห็นยอดรวม
@@ -434,10 +454,9 @@ async function showPayslip(empId,ym){
   const cfg=salaryConfigs.find(c=>c.employee_id===empId);
   const[y,m]=ym.split('-');
   const start=`${y}-${m}-01`;const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
-  const[{data:atts},{data:leaves},{data:advances}]=await Promise.all([
+  const[{data:atts},{data:leaves}]=await Promise.all([
     db.from('attendance').select('*').eq('employee_id',empId).gte('work_date',start).lte('work_date',end),
-    db.from('leave_requests').select('*').eq('employee_id',empId).eq('status','approved').gte('start_date',start).lte('end_date',end),
-    db.from('salary_advances').select('*').eq('employee_id',empId).eq('year_month',ym).eq('status','approved')
+    db.from('leave_requests').select('*').eq('employee_id',empId).eq('status','approved').gte('start_date',start).lte('end_date',end)
   ]);
 
   const base=cfg?.base_salary||0;
@@ -448,14 +467,14 @@ async function showPayslip(empId,ym){
   const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
   const otherPay=cfg?.other_pay||0;
   const otherDesc=cfg?.other_desc||'เงินเพิ่มอื่นๆ';
-  const otherDeduct=cfg?.other_deduct||0;
-  const otherDeductDesc=cfg?.other_deduct_desc||'หักอื่นๆ';
+  const d1=cfg?.other_deduct||0, d1n=cfg?.other_deduct_desc||'รายการหัก 1';
+  const d2=cfg?.other_deduct2||0, d2n=cfg?.other_deduct2_desc||'รายการหัก 2';
+  const d3=cfg?.other_deduct3||0, d3n=cfg?.other_deduct3_desc||'รายการหัก 3';
+  const totalDeduct=d1+d2+d3;
   const otMins=(atts||[]).reduce((s,a)=>s+(a.ot_minutes||0),0);
   const otPay=Math.round(otMins/60*base/30/8*1.5*100)/100;
   const gross=proratedBase+posPay+licensePay+comm+otherPay+otPay;
-  const ss=Math.min(Math.min(base,7000)*0.05,350);
-  const advTotal=(advances||[]).reduce((s,a)=>s+(a.amount||0),0);
-  const net=gross-ss-otherDeduct-advTotal;
+  const net=gross-totalDeduct;
   const lateCount=(atts||[]).filter(a=>a.is_late).length;
 
   document.getElementById('ps-emp-name').textContent='💵 '+emp.name;
@@ -471,14 +490,14 @@ async function showPayslip(empId,ym){
       ${otPay?`<tr><td>ค่า OT (${(otMins/60).toFixed(1)} ชม.)</td><td>฿${fmt(otPay)}</td></tr>`:''}
       <tr class="total-row"><td>รวมรายรับ</td><td>฿${fmt(gross)}</td></tr>
       <tr class="section"><td colspan="2">รายหัก</td></tr>
-      <tr><td>ประกันสังคม (5% ≤ ฿350)</td><td>(฿${fmt(ss)})</td></tr>
-      ${otherDeduct?`<tr><td>${otherDeductDesc}</td><td>(฿${fmt(otherDeduct)})</td></tr>`:''}
-      ${advTotal?`<tr><td>เงินเบิกล่วงหน้า</td><td>(฿${fmt(advTotal)})</td></tr>`:''}
-      <tr class="total-row"><td>รวมรายหัก</td><td>(฿${fmt(ss+otherDeduct+advTotal)})</td></tr>
+      ${d1?`<tr><td>${d1n}</td><td>(฿${fmt(d1)})</td></tr>`:''}
+      ${d2?`<tr><td>${d2n}</td><td>(฿${fmt(d2)})</td></tr>`:''}
+      ${d3?`<tr><td>${d3n}</td><td>(฿${fmt(d3)})</td></tr>`:''}
+      <tr class="total-row"><td>รวมรายหัก</td><td>(฿${fmt(totalDeduct)})</td></tr>
       <tr class="net-row"><td>💵 รับสุทธิ</td><td>฿${fmt(net)}</td></tr>
     </table>
     <div style="font-size:10px;color:var(--text3);margin-top:8px">
-      ฐานเงินเดือน: ฿${fmt(base)} · ฐาน SS: ฿${fmt(Math.min(base,7000))}
+      ฐานเงินเดือน: ฿${fmt(base)}
     </div>`;
   openModal('modal-payslip');
 }
@@ -553,10 +572,9 @@ async function createRun(){
 async function calcAndSaveItems(run){
   const[y,m]=run.year_month.split('-');
   const start=`${y}-${m}-01`;const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
-  const[{data:atts},{data:leaves},{data:advances}]=await Promise.all([
+  const[{data:atts},{data:leaves}]=await Promise.all([
     db.from('attendance').select('*').gte('work_date',start).lte('work_date',end),
-    db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end),
-    db.from('salary_advances').select('*').eq('year_month',run.year_month).eq('status','approved')
+    db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end)
   ]);
 
   const items=allEmps.map(emp=>{
@@ -569,24 +587,24 @@ async function calcAndSaveItems(run){
     const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
     const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
     const otherPay=cfg?.other_pay||0;
-    const otherDeduct=cfg?.other_deduct||0;
+    // รายการหักทั้งหมด (กรอกเอง) — หักเฉพาะรอบ final
+    const manualDeduct=run.run_type==='final'?((cfg?.other_deduct||0)+(cfg?.other_deduct2||0)+(cfg?.other_deduct3||0)):0;
     const otMins=run.run_type==='final'
       ?(atts||[]).filter(a=>a.employee_id===emp.id&&a.work_date>=run.ot_period_start&&a.work_date<=run.ot_period_end).reduce((s,a)=>s+(a.ot_minutes||0),0)
       :0;
     const otPay=otMins?Math.round(otMins/60*base/30/8*1.5*100)/100:0;
-    const ss=Math.min(Math.min(base,7000)*0.05,350);
-    const advTotal=run.run_type==='final'?(advances||[]).filter(a=>a.employee_id===emp.id).reduce((s,a)=>s+(a.amount||0),0):0;
     const advancePaid=run.run_type==='final'?ADVANCE_AMOUNT:0;
     const lateCount=empAtts.filter(a=>a.is_late).length;
     const absentCount=0;
     const gross=run.run_type==='advance'?ADVANCE_AMOUNT:(proratedBase+posPay+licensePay+comm+otherPay+otPay);
-    const net=gross-ss-otherDeduct-advTotal-(run.run_type==='final'?ADVANCE_AMOUNT:0);
+    const totalDeduct=manualDeduct+(run.run_type==='final'?ADVANCE_AMOUNT:0);
+    const net=gross-totalDeduct;
     return{
       payroll_run_id:run.id,employee_id:emp.id,
       base_salary:proratedBase,position_pay:posPay,license_pay:licensePay,commission:comm,
       ot_pay:otPay,advance_paid:advancePaid,
-      social_security:ss,advance_deduct:advTotal,
-      gross_pay:gross,total_deduct:ss+advTotal+(run.run_type==='final'?ADVANCE_AMOUNT:0),
+      social_security:0,advance_deduct:0,other_deduct:manualDeduct,
+      gross_pay:gross,total_deduct:totalDeduct,
       net_pay:net,work_days:workDays,total_days_in_month:30,
       late_count:lateCount,absent_count:absentCount,ot_minutes:otMins
     };
@@ -634,8 +652,12 @@ function openSalaryModal(empId){
   document.getElementById('ms-other-desc').value=cfg?.other_desc||'';
   document.getElementById('ms-deduct').value=cfg?.other_deduct||'';
   document.getElementById('ms-deduct-desc').value=cfg?.other_deduct_desc||'';
+  document.getElementById('ms-deduct2').value=cfg?.other_deduct2||'';
+  document.getElementById('ms-deduct2-desc').value=cfg?.other_deduct2_desc||'';
+  document.getElementById('ms-deduct3').value=cfg?.other_deduct3||'';
+  document.getElementById('ms-deduct3-desc').value=cfg?.other_deduct3_desc||'';
   document.getElementById('ms-note').value=cfg?.note||'';
-  toggleCommValue();toggleLicensePay();toggleOtherDesc();toggleDeductDesc();
+  toggleCommValue();toggleLicensePay();toggleOtherDesc();
   openModal('modal-salary');
 }
 
@@ -654,11 +676,6 @@ function toggleOtherDesc(){
   document.getElementById('ms-other-label').style.display=hasVal?'block':'none';
   document.getElementById('ms-other-desc').style.display=hasVal?'block':'none';
 }
-function toggleDeductDesc(){
-  const hasVal=parseFloat(document.getElementById('ms-deduct').value||0)>0;
-  document.getElementById('ms-deduct-label').style.display=hasVal?'block':'none';
-  document.getElementById('ms-deduct-desc').style.display=hasVal?'block':'none';
-}
 
 async function saveSalaryConfig(){
   const empId=document.getElementById('ms-emp-id').value;
@@ -674,6 +691,10 @@ async function saveSalaryConfig(){
     other_desc:document.getElementById('ms-other-desc').value.trim(),
     other_deduct:parseFloat(document.getElementById('ms-deduct').value)||0,
     other_deduct_desc:document.getElementById('ms-deduct-desc').value.trim(),
+    other_deduct2:parseFloat(document.getElementById('ms-deduct2').value)||0,
+    other_deduct2_desc:document.getElementById('ms-deduct2-desc').value.trim(),
+    other_deduct3:parseFloat(document.getElementById('ms-deduct3').value)||0,
+    other_deduct3_desc:document.getElementById('ms-deduct3-desc').value.trim(),
     note:document.getElementById('ms-note').value.trim(),
     effective_date:dateStr(new Date()),
     updated_at:new Date().toISOString()
