@@ -528,7 +528,9 @@ function loadRuns(){
       </div>
       <span class="badge ${badgeCls}">${badgeTxt}</span>
       <button style="margin-left:8px;padding:6px 12px;font-size:11px;border:1px solid var(--teal);color:var(--teal);background:#fff;border-radius:8px;cursor:pointer" onclick="showRunDetail('${r.id}')">👁 ดู</button>
-      ${r.status!=='paid'?`<button class="btn btn-teal" style="margin-left:8px;padding:6px 12px;font-size:11px" onclick="confirmRun('${r.id}')">ยืนยัน</button>`:''}
+      ${r.status==='draft'?`<button class="btn btn-teal" style="margin-left:8px;padding:6px 12px;font-size:11px" onclick="confirmRun('${r.id}')">ยืนยัน</button>
+      <button style="margin-left:4px;padding:6px 12px;font-size:11px;border:1px solid var(--blue);color:var(--blue);background:#fff;border-radius:8px;cursor:pointer" onclick="recalcRun('${r.id}')">🔄 คำนวณใหม่</button>
+      <button style="margin-left:4px;padding:6px 12px;font-size:11px;border:1px solid var(--red);color:var(--red);background:#fff;border-radius:8px;cursor:pointer" onclick="deleteRun('${r.id}')">🗑 ลบ</button>`:''}
     </div>`;
   }).join('');
 }
@@ -652,6 +654,26 @@ async function calcAndSaveItems(run){
     };
   });
   await db.from('payroll_items').insert(items);
+}
+
+async function deleteRun(id){
+  if(!confirm('ลบรอบจ่ายนี้? ข้อมูลรายการจ่ายทั้งหมดในรอบจะถูกลบ'))return;
+  const{error:e1}=await db.from('payroll_items').delete().eq('payroll_run_id',id);
+  if(e1){alert('ลบรายการไม่ได้: '+e1.message);return;}
+  const{error:e2}=await db.from('payroll_runs').delete().eq('id',id);
+  if(e2){alert('ลบรอบไม่ได้: '+e2.message);return;}
+  payrollRuns=payrollRuns.filter(r=>r.id!==id);
+  loadRuns();
+  alert('✅ ลบรอบจ่ายเรียบร้อย');
+}
+
+async function recalcRun(id){
+  if(!confirm('คำนวณใหม่? ข้อมูลเดิมในรอบนี้จะถูกลบแล้วคำนวณใหม่จากข้อมูลปัจจุบัน'))return;
+  const run=payrollRuns.find(r=>r.id===id);if(!run)return;
+  const{error}=await db.from('payroll_items').delete().eq('payroll_run_id',id);
+  if(error){alert('ลบรายการเดิมไม่ได้: '+error.message);return;}
+  await calcAndSaveItems(run);
+  alert('✅ คำนวณใหม่เรียบร้อย');
 }
 
 async function confirmRun(id){
@@ -802,7 +824,7 @@ async function approveAdv(id){
 }
 
 // close modals on backdrop click
-['modal-run','modal-salary','modal-advance','modal-payslip'].forEach(id=>{
+['modal-run','modal-salary','modal-advance','modal-payslip','modal-run-detail'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){if(e.target===this)closeModal(id);});
 });
 
