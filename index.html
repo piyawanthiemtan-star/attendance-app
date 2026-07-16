@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>ตั้งรหัสผ่าน - LOEI SMART GROUP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4"></script>
+  <style>
+    :root{--primary:#176b4d;--primary-dark:#0f5138;--surface:#fff;--background:#f2f6f4;--text:#1b2a24;--muted:#60736b;--border:#d8e3de;--danger:#b42318;--success:#137a4b}
+    *{box-sizing:border-box}
+    html,body{min-height:100%;margin:0}
+    body{display:grid;place-items:center;padding:24px;font-family:'Noto Sans Thai','Helvetica Neue',Arial,sans-serif;background:var(--background);color:var(--text)}
+    main{width:100%;max-width:440px;padding:32px;border:1px solid var(--border);border-radius:20px;background:var(--surface);box-shadow:0 16px 40px rgba(19,71,51,.10)}
+    h1{margin:0 0 8px;font-size:24px;line-height:1.35}
+    p{margin:0 0 20px;color:var(--muted);line-height:1.65}
+    .field{margin-top:16px}
+    label{display:block;margin-bottom:7px;font-weight:600}
+    input{width:100%;min-height:48px;padding:11px 13px;border:1.5px solid var(--border);border-radius:12px;font:inherit;outline:none}
+    input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(23,107,77,.12)}
+    button{width:100%;min-height:48px;margin-top:22px;border:0;border-radius:12px;background:var(--primary);color:#fff;font:600 16px inherit;cursor:pointer}
+    button:hover{background:var(--primary-dark)}
+    button:disabled{cursor:wait;opacity:.65}
+    .message{display:none;margin-top:18px;padding:12px 14px;border-radius:10px;line-height:1.55}
+    .message.error{display:block;background:#fff1f0;color:var(--danger)}
+    .message.success{display:block;background:#ecf8f1;color:var(--success)}
+    .security-note{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);font-size:13px}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>ตั้งรหัสผ่านสำหรับ Owner</h1>
+    <p id="status">กำลังตรวจสอบคำเชิญที่ปลอดภัย…</p>
+
+    <form id="password-form" hidden>
+      <div class="field">
+        <label for="password">รหัสผ่านใหม่</label>
+        <input id="password" type="password" minlength="12" autocomplete="new-password" required aria-describedby="password-help">
+        <p id="password-help">อย่างน้อย 12 ตัวอักษร ควรมีตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก ตัวเลข และสัญลักษณ์</p>
+      </div>
+      <div class="field">
+        <label for="confirm-password">ยืนยันรหัสผ่าน</label>
+        <input id="confirm-password" type="password" minlength="12" autocomplete="new-password" required>
+      </div>
+      <button id="submit-button" type="submit">บันทึกรหัสผ่าน</button>
+    </form>
+
+    <div id="message" class="message" role="alert" aria-live="polite"></div>
+    <p class="security-note">เพื่อความปลอดภัย ห้ามส่งต่อหรือถ่ายภาพ URL ที่มีข้อมูลคำเชิญ</p>
+  </main>
+
+  <script>
+    (() => {
+      const SB_URL = 'https://ihtpdwgdbcxojpmisaaz.supabase.co';
+      const SB_KEY = 'sb_publishable_i8vu7SQnl7LXjCsxMYcVIg_TebMf2MC';
+      const db = supabase.createClient(SB_URL, SB_KEY);
+      const form = document.getElementById('password-form');
+      const status = document.getElementById('status');
+      const message = document.getElementById('message');
+      const button = document.getElementById('submit-button');
+
+      const showMessage = (text, type) => {
+        message.textContent = text;
+        message.className = `message ${type}`;
+      };
+
+      const initialize = async () => {
+        const { data, error } = await db.auth.getSession();
+        if (error || !data.session) {
+          status.textContent = 'ลิงก์คำเชิญไม่ถูกต้อง หมดอายุ หรือถูกยกเลิกแล้ว';
+          showMessage('กรุณาขอคำเชิญฉบับใหม่ และอย่าใช้ลิงก์เดิมซ้ำ', 'error');
+          return;
+        }
+        history.replaceState(null, document.title, location.pathname);
+        status.textContent = 'ยืนยันคำเชิญแล้ว กรุณาตั้งรหัสผ่านใหม่';
+        form.hidden = false;
+        document.getElementById('password').focus();
+      };
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+        if (password.length < 12) {
+          showMessage('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร', 'error');
+          return;
+        }
+        if (password !== confirmPassword) {
+          showMessage('รหัสผ่านทั้งสองช่องไม่ตรงกัน', 'error');
+          return;
+        }
+        button.disabled = true;
+        button.textContent = 'กำลังบันทึก…';
+        const { error } = await db.auth.updateUser({ password });
+        if (error) {
+          showMessage(`บันทึกรหัสผ่านไม่สำเร็จ: ${error.message}`, 'error');
+          button.disabled = false;
+          button.textContent = 'บันทึกรหัสผ่าน';
+          return;
+        }
+        await db.auth.signOut({ scope: 'global' });
+        form.hidden = true;
+        status.textContent = 'ตั้งรหัสผ่านสำเร็จ';
+        showMessage('บัญชี Owner พร้อมสำหรับขั้นตอนทดสอบระบบแล้ว กรุณากลับไปแจ้งผลใน Codex', 'success');
+      });
+
+      initialize();
+    })();
+  </script>
+</body>
+</html>

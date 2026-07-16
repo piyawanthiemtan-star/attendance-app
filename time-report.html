@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>รายงานเวลาทำงาน</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4"></script>
+<script src="auth-helpers.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -32,6 +33,14 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:var(--gray);color:
 .btn-day{background:var(--blue);color:#fff}
 .btn:active{transform:scale(0.97)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-overlay{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--gray)}
+.auth-box{width:100%;max-width:380px;padding:28px 24px;border-radius:16px;background:var(--white);box-shadow:0 4px 24px rgba(0,0,0,.12)}
+.auth-box h2{text-align:center;font-size:18px;margin-bottom:6px}
+.auth-box p{text-align:center;color:var(--text3);font-size:12px;margin-bottom:18px}
+.auth-field{display:block;margin-bottom:14px;color:var(--text2);font-size:12px;font-weight:600}
+.auth-field input{width:100%;min-height:46px;margin-top:5px;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:16px;outline:none}
+.auth-field input:focus{border-color:var(--teal)}
+.auth-error{display:none;margin-top:12px;color:var(--red);font-size:12px;text-align:center}
 
 .summary-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;padding:14px 20px;background:var(--white);border-bottom:1px solid var(--border)}
 .sum-box{background:var(--gray);border-radius:10px;padding:10px 14px;text-align:center}
@@ -54,8 +63,10 @@ tr:hover td{background:#F8FFFE}
 .badge-absent{background:var(--red-light);color:var(--red)}
 .badge-leave{background:var(--blue-light);color:var(--blue)}
 .badge-holiday{background:#F3E5F5;color:#6A1B9A}
+.badge-unscheduled{background:#FFF8E1;color:#8A4B00}
 .late-min{color:var(--orange);font-weight:600}
 .ot-hrs{color:var(--blue);font-weight:600}
+.break-over{background:var(--red-light)!important;color:var(--red);font-weight:700}
 .loading{text-align:center;padding:40px;color:var(--text3)}
 .empty{text-align:center;padding:40px;color:var(--text3)}
 .emp-section{margin-bottom:24px}
@@ -75,6 +86,22 @@ tr:hover td{background:#F8FFFE}
 </head>
 <body>
 
+<div class="auth-overlay" id="report-login-overlay">
+  <div class="auth-box">
+    <h2>เข้าสู่ระบบรายงาน</h2>
+    <p>สำหรับ HR และ Owner ที่ได้รับบัญชีแล้ว</p>
+    <label class="auth-field">อีเมล
+      <input type="email" id="report-login-email" autocomplete="username" placeholder="name@example.com">
+    </label>
+    <label class="auth-field">รหัสผ่าน
+      <input type="password" id="report-login-password" autocomplete="current-password" placeholder="รหัสผ่าน" onkeydown="if(event.key==='Enter')doReportLogin()">
+    </label>
+    <button class="btn btn-search" id="report-login-button" style="width:100%;justify-content:center;min-height:46px" onclick="doReportLogin()">เข้าสู่ระบบ</button>
+    <button type="button" id="report-reset-button" style="width:100%;border:0;background:transparent;color:var(--blue);font-size:13px;font-weight:700;margin-top:12px;cursor:pointer" onclick="requestReportPasswordReset()">ลืมรหัสผ่าน / ตั้งรหัสใหม่</button>
+    <div class="auth-error" id="report-login-error"></div>
+  </div>
+</div>
+
 <div class="header">
   <div style="display:flex;align-items:center;gap:12px">
     <a href="javascript:history.back()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;text-decoration:none;flex-shrink:0" title="กลับหน้าหลัก">←</a>
@@ -88,6 +115,7 @@ tr:hover td{background:#F8FFFE}
     <button class="btn btn-export" onclick="exportExcel()" id="btn-export" disabled>
       📥 Export Excel
     </button>
+    <button class="btn" style="background:rgba(255,255,255,.2);color:#fff" onclick="doReportLogout()">ออกจากระบบ</button>
   </div>
 </div>
 
@@ -146,10 +174,11 @@ const SB_KEY='sb_publishable_i8vu7SQnl7LXjCsxMYcVIg_TebMf2MC';
 const{createClient}=supabase;
 const db=createClient(SB_URL,SB_KEY);
 
-let allEmps=[],allBranches=[],allShifts=[],reportData=[];
+let allEmps=[],allBranches=[],allShifts=[],reportData=[],reportAuthUser=null;
 const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
 const DAYS=['อา','จ','อ','พ','พฤ','ศ','ส'];
 const MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const BREAK_LIMIT_MINUTES=60;
 
 function fmtT(ts){
   if(!ts)return'--';
@@ -166,8 +195,6 @@ function fmtDay(d){
   const dt=new Date(d+'T00:00:00');
   return DAYS[dt.getDay()];
 }
-function diffMins(a,b){return Math.floor((new Date(b)-new Date(a))/60000);}
-function toHHMM(mins){if(mins<=0)return'0:00';return Math.floor(mins/60)+':'+String(mins%60).padStart(2,'0');}
 
 function toggleFilter(){
   const t=document.getElementById('report-type').value;
@@ -177,8 +204,67 @@ function toggleFilter(){
 }
 
 const dateStr=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; // YYYY-MM-DD เวลาท้องถิ่น (ไม่แปลง UTC)
+const bangkokToday=()=>{
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(part=>[part.type,part.value]));
+  return`${parts.year}-${parts.month}-${parts.day}`;
+};
+
+function employeeInServiceOnDate(employee,date){
+  if(employee.start_date&&date<employee.start_date)return false;
+  if(employee.resigned_at&&date>employee.resigned_at)return false;
+  return true;
+}
+
+function workPatternForDate(patterns,employeeId,date){
+  return(patterns||[])
+    .filter(p=>p.employee_id===employeeId&&p.effective_from<=date&&(!p.effective_to||p.effective_to>=date))
+    .sort((a,b)=>b.effective_from.localeCompare(a.effective_from))[0]||null;
+}
+
+async function doReportLogin(){
+  const email=document.getElementById('report-login-email').value.trim().toLowerCase();
+  const password=document.getElementById('report-login-password').value;
+  const button=document.getElementById('report-login-button');
+  const errorBox=document.getElementById('report-login-error');
+  if(!email||!password){errorBox.textContent='กรุณากรอกอีเมลและรหัสผ่าน';errorBox.style.display='block';return;}
+  button.disabled=true;button.textContent='กำลังเข้าสู่ระบบ...';errorBox.style.display='none';
+  try{
+    reportAuthUser=await LSMGAuth.signIn(db,email,password,['hr','owner']);
+    document.getElementById('report-login-password').value='';
+    document.getElementById('report-login-overlay').style.display='none';
+    await loadReportApp();
+  }catch(error){errorBox.textContent=error.message;errorBox.style.display='block';}
+  finally{button.disabled=false;button.textContent='เข้าสู่ระบบ';}
+}
+
+async function requestReportPasswordReset(){
+  const email=document.getElementById('report-login-email').value.trim().toLowerCase();
+  const button=document.getElementById('report-reset-button');
+  const errorBox=document.getElementById('report-login-error');
+  if(!email){errorBox.textContent='กรุณากรอกอีเมลก่อน แล้วกดตั้งรหัสใหม่';errorBox.style.display='block';return;}
+  button.disabled=true;button.textContent='กำลังส่งลิงก์...';
+  try{
+    await LSMGAuth.requestPasswordReset(db,email,`${location.origin}/index.html`);
+    errorBox.textContent='ส่งลิงก์ตั้งรหัสผ่านแล้ว กรุณาตรวจสอบอีเมลและกล่อง Spam';errorBox.style.display='block';
+  }catch(error){errorBox.textContent=error.message;errorBox.style.display='block';}
+  finally{button.disabled=false;button.textContent='ลืมรหัสผ่าน / ตั้งรหัสใหม่';}
+}
+
+async function doReportLogout(){
+  await LSMGAuth.signOut(db);
+  reportAuthUser=null;
+  document.getElementById('report-login-password').value='';
+  document.getElementById('report-login-overlay').style.display='flex';
+}
 
 async function init(){
+  reportAuthUser=await LSMGAuth.restore(db,['hr','owner']);
+  if(!reportAuthUser){document.getElementById('report-login-overlay').style.display='flex';return;}
+  document.getElementById('report-login-overlay').style.display='none';
+  await loadReportApp();
+}
+
+async function loadReportApp(){
   // Set default month
   const now=new Date();
   document.getElementById('sel-month').value=now.getFullYear()+'-'+(now.getMonth()+1).toString().padStart(2,'0');
@@ -193,7 +279,7 @@ async function init(){
   allEmps=emps||[];allBranches=branches||[];allShifts=shifts||[];
 
   const empSel=document.getElementById('sel-emp');
-  allEmps.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.name;empSel.appendChild(o);});
+  allEmps.filter(e=>e.payroll_eligible!==false||e.attendance_required!==false).forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.name;empSel.appendChild(o);});
   const brSel=document.getElementById('sel-branch');
   allBranches.forEach(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=b.name;brSel.appendChild(o);});
 }
@@ -219,6 +305,7 @@ async function loadReport(){
   const{start,end,label}=getDateRange();
   const empFilter=document.getElementById('sel-emp').value;
   const brFilter=document.getElementById('sel-branch').value;
+  const today=bangkokToday();
   document.getElementById('report-period').textContent=`ช่วงเวลา: ${label}`;
 
   // Load attendance
@@ -226,10 +313,17 @@ async function loadReport(){
   const{data:atts}=await attQ;
 
   // Load leaves
-  const{data:leaves}=await db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end);
+  const[{data:leaves},{data:workPatterns,error:workPatternError}]=await Promise.all([
+    db.from('leave_requests').select('*').eq('status','approved').lte('start_date',end).gte('end_date',start),
+    db.from('employee_work_patterns').select('*').lte('effective_from',end)
+  ]);
+  if(workPatternError){
+    document.getElementById('report-content').innerHTML=`<div class="empty" style="color:var(--red)">โหลดตารางวันหยุดไม่ได้: ${workPatternError.message}</div>`;
+    return;
+  }
 
   // Filter emps
-  let emps=allEmps;
+  let emps=allEmps.filter(e=>e.payroll_eligible!==false||e.attendance_required!==false);
   if(empFilter!=='all') emps=emps.filter(e=>e.id===empFilter);
   if(brFilter!=='all') emps=emps.filter(e=>e.branch_id===brFilter);
 
@@ -249,7 +343,7 @@ async function loadReport(){
     const empAtts=(atts||[]).filter(a=>a.employee_id===emp.id);
     const empLeaves=(leaves||[]).filter(l=>l.employee_id===emp.id);
 
-    let empDays=0,empLate=0,empLateMin=0,empAbsent=0,empLeave=0,empOT=0;
+    let empDays=0,empLate=0,empLateMin=0,empAbsent=0,empLeave=0,empOT=0,empUnscheduled=0;
     const rows=[];
     const empRawData=[];
 
@@ -257,20 +351,25 @@ async function loadReport(){
       const dt=new Date(date+'T00:00:00');
       const att=empAtts.find(a=>a.work_date===date);
       const lv=empLeaves.find(l=>l.start_date<=date&&l.end_date>=date);
+      const pattern=workPatternForDate(workPatterns,emp.id,date);
+      const isWeeklyOff=pattern&&pattern.weekly_off_days.includes(dt.getDay());
+      const inService=employeeInServiceOnDate(emp,date);
 
-      let status='',cin='--',cout='--',workMins=0,lateMins=0,otMins=0,note='',rowClass='';
+      let status='',cin='--',breakStart='--',breakEnd='--',cout='--',lateMins=0,otMins=0,note='',rowClass='',breakMins=null;
 
-      if(lv){
-        status='leave';empLeave++;totLeave++;
-        const typeMap={sick:'ลาป่วย',personal:'ลากิจ',vacation:'ลาพักร้อน',unpaid:'ลาหักเงิน'};
-        note=typeMap[lv.leave_type]||lv.leave_type;
-      } else if(att?.check_in){
+      if(att?.check_in){
         empDays++;totDays++;
         cin=fmtT(att.check_in);
+        breakStart=att.break_start?fmtT(att.break_start):'--';
+        breakEnd=att.break_end?fmtT(att.break_end):'--';
+        if(att.break_start){
+          const breakFinish=att.break_end||att.check_out||new Date().toISOString();
+          const duration=Math.floor((new Date(breakFinish)-new Date(att.break_start))/60000);
+          if(Number.isFinite(duration)&&duration>=0)breakMins=duration;
+        }
         cout=att.check_out?fmtT(att.check_out):'(ยังอยู่)';
-        if(att.check_out) workMins=diffMins(att.check_in,att.check_out);
         const rShift=allShifts.find(x=>x.id===att.shift_id)||shift;  // กะของ record วันนั้นก่อน (รองรับกะรายวัน) ค่อย fallback กะประจำตัว
-        if(rShift){
+        if(rShift&&emp.attendance_required!==false){
           const[sh,sm]=rShift.check_in_time.split(':').map(Number);
           const cinD=new Date(att.check_in);
           lateMins=Math.max(0,(cinD.getHours()*60+cinD.getMinutes())-(sh*60+sm));
@@ -279,22 +378,36 @@ async function loadReport(){
           // OT
           if(rShift.has_ot&&att.ot_minutes){otMins=att.ot_minutes;empOT+=otMins/60;totOT+=otMins/60;}
         } else status='ok';
-        if(lv) note='';
+        if(isWeeklyOff)note='มาทำงานในวันหยุดประจำสัปดาห์';
+      } else if(date>today){
+        status='future';note='ยังไม่ถึงวันทำงาน';
+      } else if(!inService){
+        status='not_applicable';note=emp.start_date&&date<emp.start_date?'ยังไม่เริ่มงาน':'พ้นสภาพแล้ว';
+      } else if(emp.attendance_required===false){
+        status='exempt';note='ยกเว้นการลงเวลา';
+      } else if(isWeeklyOff){
+        status='holiday';note='วันหยุดประจำสัปดาห์';
+      } else if(lv){
+        status='leave';empLeave++;totLeave++;
+        const typeMap={sick:'ลาป่วย',personal:'ลากิจ',vacation:'ลาพักร้อน',unpaid:'ลาหักเงิน'};
+        note=typeMap[lv.leave_type]||lv.leave_type;
+      } else if(!pattern){
+        status='unscheduled';empUnscheduled++;note='ยังไม่กำหนดวันหยุดประจำสัปดาห์';
       } else {
-        // Check if it's a weekend with no shift
-        const isWeekend=dt.getDay()===0||dt.getDay()===6;
-        if(isWeekend&&!shift){status='holiday';note='วันหยุด';}
-        else{status='absent';empAbsent++;totAbsent++;}
+        status='absent';empAbsent++;totAbsent++;
       }
 
-      const badgeMap={ok:'<span class="badge badge-ok">✅ ปกติ</span>',late:`<span class="badge badge-late">⚠️ สาย ${lateMins}น.</span>`,absent:'<span class="badge badge-absent">❌ ขาด</span>',leave:'<span class="badge badge-leave">📋 ลา</span>',holiday:'<span class="badge badge-holiday">🏖️ หยุด</span>'};
+      const breakOver=breakMins!==null&&breakMins>BREAK_LIMIT_MINUTES;
+
+      const badgeMap={ok:'<span class="badge badge-ok">✅ ปกติ</span>',late:`<span class="badge badge-late">⚠️ สาย ${lateMins}น.</span>`,absent:'<span class="badge badge-absent">❌ ขาด</span>',leave:'<span class="badge badge-leave">📋 ลา</span>',holiday:'<span class="badge badge-holiday">วันหยุด</span>',unscheduled:'<span class="badge badge-unscheduled">รอตั้งตาราง</span>',exempt:'<span class="badge badge-holiday">ยกเว้นลงเวลา</span>',not_applicable:'<span class="badge badge-holiday">—</span>',future:'<span class="badge badge-holiday">ยังไม่ถึงวัน</span>'};
 
       rows.push(`<tr class="${status==='absent'?'':''}">
         <td>${dt.getDate()}</td>
         <td>${fmtDay(date)}</td>
         <td>${cin}</td>
+        <td class="${breakOver?'break-over':''}">${breakStart}</td>
+        <td class="${breakOver?'break-over':''}">${breakEnd}</td>
         <td>${cout}</td>
-        <td>${workMins>0?toHHMM(workMins):'--'}</td>
         <td>${lateMins>5?`<span class="late-min">${lateMins}น.</span>`:'--'}</td>
         <td>${otMins>0?`<span class="ot-hrs">${(otMins/60).toFixed(1)}ชม.</span>`:'--'}</td>
         <td>${badgeMap[status]||''}</td>
@@ -304,9 +417,12 @@ async function loadReport(){
       // Raw data for export
       empRawData.push({
         ชื่อ:emp.name, แผนก:emp.department||'', สาขา:(allBranches.find(b=>b.id===emp.branch_id)||{}).name||'',
-        วันที่:date, วัน:fmtDay(date), เวลาเข้า:cin==='--'?'':cin, เวลาออก:cout==='--'?'':cout,
-        รวมชั่วโมง:workMins>0?toHHMM(workMins):'', สาย_นาที:lateMins>5?lateMins:'', OT_ชม:otMins>0?(otMins/60).toFixed(1):'',
-        สถานะ:status==='ok'?'ปกติ':status==='late'?'สาย':status==='absent'?'ขาด':status==='leave'?'ลา':status==='holiday'?'หยุด':'',
+        วันที่:date, วัน:fmtDay(date), เวลาเข้า:cin==='--'?'':cin,
+        เวลาออกพัก:breakStart==='--'?'':breakStart, เวลากลับเข้าทำงาน:breakEnd==='--'?'':breakEnd,
+        พัก_นาที:breakMins??'', เตือนพักเกิน:breakOver?'พักเกิน 60 นาที':'',
+        เวลาออก:cout==='--'?'':cout,
+        สาย_นาที:lateMins>5?lateMins:'', OT_ชม:otMins>0?(otMins/60).toFixed(1):'',
+        สถานะ:status==='ok'?'ปกติ':status==='late'?'สาย':status==='absent'?'ขาด':status==='leave'?'ลา':status==='holiday'?'หยุด':status==='unscheduled'?'รอตั้งตาราง':status==='exempt'?'ยกเว้นลงเวลา':status==='not_applicable'?'ไม่อยู่ในช่วงจ้าง':status==='future'?'ยังไม่ถึงวัน':'',
         หมายเหตุ:note
       });
     });
@@ -315,12 +431,11 @@ async function loadReport(){
 
     const summaryRow=`<tr class="summary-row">
       <td colspan="2" class="left">สรุป ${emp.name}</td>
-      <td colspan="2">มาทำงาน <strong>${empDays}</strong> วัน</td>
-      <td>--</td>
+      <td colspan="4">มาทำงาน <strong>${empDays}</strong> วัน</td>
       <td>${empLate>0?`<span class="late-min">${empLate}ครั้ง ${empLateMin}น.</span>`:'ไม่สาย'}</td>
       <td>${empOT>0?`<span class="ot-hrs">${empOT.toFixed(1)}ชม.</span>`:'--'}</td>
-      <td>${empLate===0&&empLeave===0&&empAbsent===0?'<span class="badge badge-ok">✅ ได้เบี้ย</span>':'<span class="badge badge-absent">❌ ไม่ได้เบี้ย</span>'}</td>
-      <td style="color:var(--text3)">ลา ${empLeave}วัน | ขาด ${empAbsent}วัน</td>
+      <td>${emp.attendance_required===false?'<span class="badge badge-holiday">ยกเว้นลงเวลา</span>':empUnscheduled>0?'<span class="badge badge-unscheduled">รอตรวจตาราง</span>':empLate===0&&empLeave===0&&empAbsent===0?'<span class="badge badge-ok">✅ ได้เบี้ย</span>':'<span class="badge badge-absent">❌ ไม่ได้เบี้ย</span>'}</td>
+      <td style="color:var(--text3)">ลา ${empLeave}วัน | ขาด ${empAbsent}วัน${empUnscheduled?` | รอตาราง ${empUnscheduled}วัน`:''}</td>
     </tr>`;
 
     return`<div class="emp-section">
@@ -335,6 +450,7 @@ async function loadReport(){
           ${empLate>0?`<span class="stat-pill" style="background:var(--orange-light);color:var(--orange)">สาย ${empLate}ครั้ง ${empLateMin}น.</span>`:''}
           ${empAbsent>0?`<span class="stat-pill" style="background:var(--red-light);color:var(--red)">ขาด ${empAbsent}วัน</span>`:''}
           ${empLeave>0?`<span class="stat-pill" style="background:var(--blue-light);color:var(--blue)">ลา ${empLeave}วัน</span>`:''}
+          ${empUnscheduled>0?`<span class="stat-pill" style="background:#FFF8E1;color:#8A4B00">รอตั้งตาราง ${empUnscheduled}วัน</span>`:''}
           ${empOT>0?`<span class="stat-pill" style="background:#EDE7F6;color:#4527A0">OT ${empOT.toFixed(1)}ชม.</span>`:''}
         </div>
       </div>
@@ -342,8 +458,8 @@ async function loadReport(){
         <table>
           <thead>
             <tr>
-              <th>วันที่</th><th>วัน</th><th>เวลาเข้า</th><th>เวลาออก</th>
-              <th>รวมเวลา</th><th>สาย(น.)</th><th>OT</th><th>สถานะ</th><th class="left">หมายเหตุ</th>
+              <th>วันที่</th><th>วัน</th><th>เวลาเข้า</th><th>ออกพัก</th><th>กลับเข้าทำงาน</th><th>เวลาออก</th>
+              <th>สาย(น.)</th><th>OT</th><th>สถานะ</th><th class="left">หมายเหตุ</th>
             </tr>
           </thead>
           <tbody>${rows.join('')}${summaryRow}</tbody>
@@ -379,8 +495,9 @@ function exportExcel(){
     const lateMin=rows.reduce((s,r)=>s+(r.สาย_นาที||0),0);
     const absentDays=rows.filter(r=>r.สถานะ==='ขาด').length;
     const leaveDays=rows.filter(r=>r.สถานะ==='ลา').length;
+    const unscheduledDays=rows.filter(r=>r.สถานะ==='รอตั้งตาราง').length;
     const otHrs=rows.reduce((s,r)=>s+parseFloat(r.OT_ชม||0),0);
-    const qualified=lateDays===0&&absentDays===0&&leaveDays===0;
+    const qualified=lateDays===0&&absentDays===0&&leaveDays===0&&unscheduledDays===0;
     summary.push({
       ชื่อ:name,
       แผนก:rows[0]?.แผนก||'',
@@ -390,6 +507,7 @@ function exportExcel(){
       สาย_นาทีรวม:lateMin,
       ขาด_วัน:absentDays,
       ลา_วัน:leaveDays,
+      รอตั้งตาราง_วัน:unscheduledDays,
       OT_ชม:otHrs.toFixed(1),
       เบี้ยขยัน:qualified?'ได้':'ไม่ได้'
     });
@@ -409,8 +527,9 @@ function exportExcel(){
       วันที่:r.วันที่,
       วัน:r.วัน,
       เวลาเข้า:r.เวลาเข้า,
+      เวลาออกพัก:r.เวลาออกพัก,
+      เวลากลับเข้าทำงาน:r.เวลากลับเข้าทำงาน,
       เวลาออก:r.เวลาออก,
-      รวมชั่วโมง:r.รวมชั่วโมง,
       สาย_นาที:r.สาย_นาที||'',
       OT_ชม:r.OT_ชม||'',
       สถานะ:r.สถานะ,
@@ -423,24 +542,26 @@ function exportExcel(){
     const lateMin=rows.reduce((s,r)=>s+(r.สาย_นาที||0),0);
     const absentDays=rows.filter(r=>r.สถานะ==='ขาด').length;
     const leaveDays=rows.filter(r=>r.สถานะ==='ลา').length;
+    const unscheduledDays=rows.filter(r=>r.สถานะ==='รอตั้งตาราง').length;
     const otHrs=rows.reduce((s,r)=>s+parseFloat(r.OT_ชม||0),0);
-    const qualified=lateDays===0&&absentDays===0&&leaveDays===0;
+    const qualified=lateDays===0&&absentDays===0&&leaveDays===0&&unscheduledDays===0;
 
     sheetData.push({});  // empty row
     sheetData.push({
       วันที่:'สรุป',
       วัน:'',
       เวลาเข้า:'มาทำงาน: '+workDays+' วัน',
+      เวลาออกพัก:'',
+      เวลากลับเข้าทำงาน:'',
       เวลาออก:'สาย: '+lateDays+' ครั้ง ('+lateMin+' นาที)',
-      รวมชั่วโมง:'ขาด: '+absentDays+' วัน',
-      สาย_นาที:'ลา: '+leaveDays+' วัน',
+      สาย_นาที:'ขาด: '+absentDays+' วัน',
       OT_ชม:'OT: '+otHrs.toFixed(1)+' ชม.',
       สถานะ:'เบี้ยขยัน: '+(qualified?'✅ ได้':'❌ ไม่ได้'),
-      หมายเหตุ:''
+      หมายเหตุ:'ลา: '+leaveDays+' วัน'+(unscheduledDays?' | รอตั้งตาราง '+unscheduledDays+' วัน':'')
     });
 
     const ws=XLSX.utils.json_to_sheet(sheetData);
-    ws['!cols']=[{wch:12},{wch:6},{wch:10},{wch:10},{wch:12},{wch:10},{wch:10},{wch:10},{wch:14}];
+    ws['!cols']=[{wch:12},{wch:6},{wch:10},{wch:10},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:18}];
 
     // ชื่อ Sheet ตัดให้ไม่เกิน 31 ตัวอักษร (Excel limit)
     const sheetName=name.substring(0,31);

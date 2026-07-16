@@ -1,17 +1,19 @@
-const CACHE_NAME = 'lsg-attendance-v2';
+const CACHE_NAME = 'lsg-attendance-v12';
 const ASSETS = [
+  './index.html',
   './attendance-app.html',
   './time-report.html',
-  './icon-192.png',
-  './icon-512.png',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  './auth-helpers.js',
+  './assets/icons/app/icon-192.png',
+  './assets/icons/app/icon-512.png',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4',
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(['./attendance-app.html','./time-report.html','./icon-192.png','./icon-512.png']);
+      return cache.addAll(['./index.html','./attendance-app.html','./time-report.html','./auth-helpers.js','./assets/icons/app/icon-192.png','./assets/icons/app/icon-512.png']);
     })
   );
   self.skipWaiting();
