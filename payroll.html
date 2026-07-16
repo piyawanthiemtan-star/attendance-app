@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PAYROLL LOEI SMART GROUP</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4"></script>
+<script src="auth-helpers.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -36,7 +37,7 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:var(--gray);color:
 label.fl{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--text2)}
 input.fi,select.fi{padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;background:var(--gray);color:var(--text);outline:none}
 input.fi:focus,select.fi:focus{border-color:var(--teal)}
-.emp-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:8px}
+.emp-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:8px;flex-wrap:wrap}
 .emp-row:hover{background:var(--teal-light);border-color:var(--teal)}
 .emp-row.selected{background:var(--teal-light);border-color:var(--teal)}
 .av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
@@ -62,6 +63,8 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
 .badge-draft{background:#F3E5F5;color:#6A1B9A}
 .badge-confirmed{background:#E3F2FD;color:#0D47A1}
 .badge-paid{background:#E8F5E9;color:#1B5E20}
+.badge-pending{background:#FFF8E1;color:#8D5B00}
+.badge-cancelled{background:#ECEFF1;color:#546E7A}
 .loading-text{text-align:center;padding:30px;color:var(--text3)}
 /* modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-end;justify-content:center}
@@ -74,6 +77,19 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
 .modal-input:focus{border-color:var(--teal)}
 .btn-primary{width:100%;padding:12px;border-radius:10px;background:var(--teal);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;margin-top:14px}
 .btn-secondary{width:100%;padding:11px;border-radius:10px;background:var(--border);color:var(--text2);font-size:13px;font-weight:600;border:none;cursor:pointer;margin-top:8px}
+.payslip-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.payslip-actions .btn-secondary{margin-top:0}
+.payroll-back{width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;flex-shrink:0}
+.adjustment-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.adjustment-summary>div{background:var(--gray);border-radius:10px;padding:10px 8px;text-align:center}
+.adjustment-summary strong{display:block;font-size:15px;font-variant-numeric:tabular-nums;margin-top:3px}
+.run-readiness{margin-top:14px;padding:12px;border-radius:10px;border:1.5px solid var(--border);line-height:1.55}
+.run-readiness.ready{background:#E8F5E9;border-color:#A5D6A7;color:#1B5E20}
+.run-readiness.blocked{background:#FFEBEE;border-color:#EF9A9A;color:#B71C1C}
+.run-readiness.warning{background:#FFF8E1;border-color:#FFE082;color:#8D5B00}
+.run-readiness ul{margin:6px 0 0 20px}
+.btn-primary:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:600px){.adjustment-summary{grid-template-columns:1fr}.header{align-items:flex-start}.header>div:last-child{width:100%}}
 @media print{.tabs,.btn,.header{display:none}.content{padding:0}}
 </style>
 </head>
@@ -81,15 +97,16 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
 
 <div class="header">
   <div style="display:flex;align-items:center;gap:12px">
-    <a href="attendance-app.html" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:16px">←</a>
+    <button type="button" class="payroll-back" onclick="goPayrollHome()" aria-label="กลับหน้าหลัก PAYROLL LOEI SMART GROUP" title="กลับหน้าหลัก Payroll">←</button>
     <div>
-      <h1><img src="icon-512-payroll.png" style="width:24px;height:24px;vertical-align:middle;border-radius:4px;margin-right:6px"> PAYROLL LOEI SMART GROUP</h1>
+      <h1><img src="assets/icons/payroll/icon-512-payroll.png" style="width:24px;height:24px;vertical-align:middle;border-radius:4px;margin-right:6px"> PAYROLL LOEI SMART GROUP</h1>
       <div style="font-size:11px;color:rgba(255,255,255,.8)" id="hdr-period">กำลังโหลด...</div>
     </div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn btn-green" onclick="openRunModal()" id="btn-new-run">+ สร้างรอบจ่าย</button>
     <button class="btn btn-gray" onclick="window.print()">🖨️ พิมพ์</button>
+    <button class="btn btn-gray" onclick="doLogout()">ออกจากระบบ</button>
   </div>
 </div>
 
@@ -149,17 +166,18 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
 <div id="login-overlay" style="display:none;position:fixed;inset:0;background:var(--gray);z-index:999;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:16px;padding:28px 24px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,0.12)">
     <div style="text-align:center;margin-bottom:20px">
-      <img src="icon-512-payroll.png" style="width:64px;height:64px;border-radius:16px;margin-bottom:8px">
+      <img src="assets/icons/payroll/icon-512-payroll.png" style="width:64px;height:64px;border-radius:16px;margin-bottom:8px">
       <div style="font-size:17px;font-weight:700">PAYROLL LOEI SMART GROUP</div>
       <div style="font-size:12px;color:var(--text3);margin-top:4px">กรุณาเข้าสู่ระบบ</div>
     </div>
-    <label class="fl" style="margin-bottom:10px">เลือกชื่อพนักงาน
-      <select class="fi" id="login-emp" style="margin-top:4px"><option value="">-- เลือกชื่อ --</option></select>
+    <label class="fl" style="margin-bottom:10px">อีเมล Owner
+      <input type="email" class="fi" id="login-email" autocomplete="username" placeholder="name@example.com" style="margin-top:4px">
     </label>
-    <label class="fl" style="margin-bottom:16px">รหัส PIN 4 หลัก
-      <input type="password" class="fi" id="login-pin" maxlength="4" placeholder="••••" inputmode="numeric" style="margin-top:4px;letter-spacing:6px;font-size:18px" onkeydown="if(event.key==='Enter')doLogin()">
+    <label class="fl" style="margin-bottom:16px">รหัสผ่าน
+      <input type="password" class="fi" id="login-password" autocomplete="current-password" placeholder="รหัสผ่าน" style="margin-top:4px;font-size:16px" onkeydown="if(event.key==='Enter')doLogin()">
     </label>
     <button class="btn-primary" onclick="doLogin()" id="login-btn">เข้าสู่ระบบ</button>
+    <button type="button" onclick="requestPayrollPasswordReset()" id="login-reset-btn" style="width:100%;border:0;background:transparent;color:var(--blue);font-size:13px;font-weight:700;margin-top:12px;cursor:pointer">ลืมรหัสผ่าน / ตั้งรหัสใหม่</button>
     <div id="login-err" style="color:#E53935;font-size:12px;text-align:center;margin-top:10px;display:none"></div>
   </div>
 </div>
@@ -169,7 +187,7 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
   <div class="modal-box">
     <div class="modal-title">📅 สร้างรอบจ่ายเงินเดือน <button class="modal-close" onclick="closeModal('modal-run')">✕</button></div>
     <label class="modal-label">เดือน</label>
-    <input type="month" class="modal-input" id="run-month">
+    <input type="month" class="modal-input" id="run-month" onchange="updateRunDefaults()">
     <label class="modal-label">ประเภท</label>
     <select class="modal-input" id="run-type" onchange="updateRunDefaults()">
       <option value="advance">รอบที่ 1 — จ่ายวันที่ 15 (฿4,000)</option>
@@ -185,7 +203,8 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
     </div>
     <label class="modal-label">หมายเหตุ</label>
     <input class="modal-input" id="run-note" placeholder="(ถ้ามี)">
-    <button class="btn-primary" onclick="createRun()">✅ สร้างรอบและคำนวณ</button>
+    <div id="run-readiness" class="run-readiness warning" role="status" aria-live="polite">กำลังตรวจสอบความพร้อม...</div>
+    <button class="btn-primary" id="btn-create-run" onclick="createRun()" disabled>✅ สร้างรอบและคำนวณ</button>
     <button class="btn-secondary" onclick="closeModal('modal-run')">ยกเลิก</button>
   </div>
 </div>
@@ -277,7 +296,10 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
   <div class="modal-box">
     <div class="modal-title"><span id="ps-emp-name">สลิปเงินเดือน</span> <button class="modal-close" onclick="closeModal('modal-payslip')">✕</button></div>
     <div id="payslip-content"></div>
-    <button class="btn-secondary" onclick="closeModal('modal-payslip')">ปิด</button>
+    <div class="payslip-actions">
+      <button class="btn-primary" style="margin-top:0" onclick="exportPayslipPdf()">PDF / พิมพ์</button>
+      <button class="btn-secondary" onclick="closeModal('modal-payslip')">ปิด</button>
+    </div>
   </div>
 </div>
 
@@ -288,6 +310,27 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
     <div id="rd-summary" style="font-size:12px;color:var(--text3);margin-bottom:10px"></div>
     <div id="rd-list" style="max-height:60vh;overflow-y:auto"></div>
     <button class="btn-secondary" onclick="closeModal('modal-run-detail')">ปิด</button>
+  </div>
+</div>
+
+<!-- MODAL: ปรับยอดเฉพาะรอบจ่าย -->
+<div class="modal-overlay" id="modal-payroll-adjustment">
+  <div class="modal-box">
+    <div class="modal-title"><span id="pa-title">ปรับยอดรอบจ่าย</span> <button class="modal-close" onclick="closeModal('modal-payroll-adjustment')">✕</button></div>
+    <div class="adjustment-summary">
+      <div><span class="sum-lbl">ยอดเดิม</span><strong id="pa-base-net">฿0.00</strong></div>
+      <div><span class="sum-lbl">เพิ่ม / ลด</span><strong id="pa-change">฿0.00</strong></div>
+      <div><span class="sum-lbl">ยอดสุทธิใหม่</span><strong id="pa-new-net" style="color:var(--teal)">฿0.00</strong></div>
+    </div>
+    <label class="modal-label" for="pa-income">เพิ่มเงินเฉพาะรอบนี้ (บาท)</label>
+    <input type="number" class="modal-input" id="pa-income" min="0" step="0.01" inputmode="decimal">
+    <label class="modal-label" for="pa-deduct">ลด / หักเงินเฉพาะรอบนี้ (บาท)</label>
+    <input type="number" class="modal-input" id="pa-deduct" min="0" step="0.01" inputmode="decimal">
+    <label class="modal-label" for="pa-reason">เหตุผลการแก้ไข *</label>
+    <textarea class="modal-input" id="pa-reason" rows="3" placeholder="เช่น เพิ่มค่าคอมมิชชั่น หรือหักเงินตามรายการที่อนุมัติ"></textarea>
+    <div style="font-size:11px;color:var(--text3);line-height:1.5;margin-top:8px">การแก้ไขนี้มีผลเฉพาะรอบจ่ายปัจจุบัน ไม่เปลี่ยนเงินเดือนพื้นฐาน และระบบบันทึกประวัติผู้แก้ไข</div>
+    <button class="btn-primary" id="pa-save" onclick="savePayrollAdjustment()">บันทึกยอดใหม่</button>
+    <button class="btn-secondary" onclick="closeModal('modal-payroll-adjustment')">ยกเลิก</button>
   </div>
 </div>
 
@@ -302,49 +345,86 @@ const dateStr=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
 const ADVANCE_AMOUNT=4000; // รอบ 1 จ่ายคงที่
 
-let allEmps=[],salaryConfigs=[],payrollRuns=[],currentUser=null,isOwner=false;
+let allEmps=[],salaryConfigs=[],payrollRuns=[],allWorkPatterns=[],paymentTracking=[],currentUser=null,isOwner=false,currentRunItems=[],selectedPayrollItem=null,selectedPayrollRun=null;
 
 function fmt(n){if(!n&&n!==0)return'–';return Number(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtD(d){if(!d)return'–';const dt=new Date(d+'T00:00:00');return dt.getDate()+' '+MONTHS[dt.getMonth()]+' '+(dt.getFullYear()+543);}
 function thaiM(ym){if(!ym)return'';const[y,m]=ym.split('-');return MONTHS[parseInt(m)-1]+' '+(parseInt(y)+543);}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 function openModal(id){document.getElementById(id).classList.add('show');}
-
-async function loadLoginEmpList(){
-  const{data}=await db.from('employees').select('id,name,role').eq('role','owner').order('name');
-  const sel=document.getElementById('login-emp');
-  (data||[]).forEach(e=>{
-    const o=document.createElement('option');
-    o.value=e.id;
-    o.textContent=e.name+(e.role==='owner'?' 👑':e.role==='hr'?' 👩‍💼':'');
-    sel.appendChild(o);
-  });
+function goPayrollHome(){
+  ['modal-run','modal-salary','modal-advance','modal-payslip','modal-run-detail','modal-payroll-adjustment'].forEach(closeModal);
+  switchTab('summary');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function employeeEligibleForPeriod(employee,start,end){
+  if(employee.start_date&&employee.start_date>end)return false;
+  if(employee.resigned_at&&employee.resigned_at<start)return false;
+  return true;
+}
+function eligibleEmployeesForRun(run){
+  const[y,m]=run.year_month.trim().split('-');
+  const start=`${y}-${m}-01`;
+  const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
+  if(run.run_type!=='advance')return allEmps.filter(employee=>employee.payroll_eligible!==false&&employeeEligibleForPeriod(employee,start,end));
+  const payDate=new Date((run.pay_date||`${y}-${m}-15`)+'T00:00:00');
+  const activeOnPayDate=dateStr(payDate);
+  payDate.setMonth(payDate.getMonth()-1);
+  const tenureCutoff=dateStr(payDate);
+  return allEmps.filter(employee=>employee.payroll_eligible!==false&&employeeEligibleForPeriod(employee,activeOnPayDate,activeOnPayDate)
+    &&(!employee.start_date||employee.start_date<=tenureCutoff));
+}
+function workPatternForDate(patterns,employeeId,date){
+  return(patterns||[])
+    .filter(p=>p.employee_id===employeeId&&p.effective_from<=date&&(!p.effective_to||p.effective_to>=date))
+    .sort((a,b)=>b.effective_from.localeCompare(a.effective_from))[0]||null;
 }
 
 async function doLogin(){
-  const id=document.getElementById('login-emp').value;
-  const pin=document.getElementById('login-pin').value;
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  const password=document.getElementById('login-password').value;
   const btn=document.getElementById('login-btn');
   const err=document.getElementById('login-err');
-  if(!id||!pin){err.textContent='กรุณาเลือกชื่อและใส่ PIN';err.style.display='block';return;}
+  if(!email||!password){err.textContent='กรุณากรอกอีเมลและรหัสผ่าน';err.style.display='block';return;}
   btn.textContent='กำลังเข้าสู่ระบบ...';btn.disabled=true;err.style.display='none';
-  const{data}=await db.from('employees').select('*').eq('id',id).eq('pin',pin).single();
-  if(!data){err.textContent='PIN ไม่ถูกต้อง กรุณาลองใหม่';err.style.display='block';btn.textContent='เข้าสู่ระบบ';btn.disabled=false;return;}
-  currentUser=data;
-  isOwner=data.role==='owner';
-  document.getElementById('login-overlay').style.display='none';
-  document.getElementById('login-pin').value='';
-  await loadMainData();
+  try{
+    currentUser=await LSMGAuth.signIn(db,email,password,['owner']);
+    isOwner=true;
+    document.getElementById('login-overlay').style.display='none';
+    document.getElementById('login-password').value='';
+    await loadMainData();
+  }catch(error){err.textContent=error.message;err.style.display='block';}
+  finally{btn.textContent='เข้าสู่ระบบ';btn.disabled=false;}
+}
+
+async function requestPayrollPasswordReset(){
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  const button=document.getElementById('login-reset-btn');
+  const err=document.getElementById('login-err');
+  if(!email){err.textContent='กรุณากรอกอีเมลก่อน แล้วกดตั้งรหัสใหม่';err.style.display='block';return;}
+  button.disabled=true;button.textContent='กำลังส่งลิงก์...';
+  try{
+    await LSMGAuth.requestPasswordReset(db,email,`${location.origin}/index.html`);
+    err.textContent='ส่งลิงก์ตั้งรหัสผ่านแล้ว กรุณาตรวจสอบอีเมลและกล่อง Spam';err.style.display='block';
+  }catch(error){err.textContent=error.message;err.style.display='block';}
+  finally{button.disabled=false;button.textContent='ลืมรหัสผ่าน / ตั้งรหัสใหม่';}
+}
+
+async function doLogout(){
+  await LSMGAuth.signOut(db);
+  currentUser=null;isOwner=false;
+  document.getElementById('login-password').value='';
+  document.getElementById('login-overlay').style.display='flex';
 }
 
 async function init(){
-  // โหลดรายชื่อพนักงานสำหรับ dropdown login ก่อนเสมอ
-  await loadLoginEmpList();
-  // ถ้ายังไม่ได้ล็อกอิน แสดง login overlay
+  currentUser=await LSMGAuth.restore(db,['owner']);
   if(!currentUser){
     document.getElementById('login-overlay').style.display='flex';
     return;
   }
+  isOwner=true;
+  document.getElementById('login-overlay').style.display='none';
   await loadMainData();
 }
 
@@ -363,16 +443,24 @@ async function loadMainData(){
   document.getElementById('adv-date').value=dateStr(now);
   document.getElementById('hdr-period').textContent=thaiM(ym);
 
-  const[{data:emps},{data:configs},{data:runs}]=await Promise.all([
+  const[employeeResult,salaryResult,runResult,patternResult,paymentResult]=await Promise.all([
     db.from('employees').select('*').order('name'),
     // RLS จะ filter ให้อัตโนมัติ: owner เห็นทุกคน, คนอื่นเห็นแค่ตัวเอง
     db.from('employee_salary').select('*'),
-    db.from('payroll_runs').select('*').order('pay_date',{ascending:false})
+    db.from('payroll_runs').select('*').order('pay_date',{ascending:false}),
+    db.from('employee_work_patterns').select('*').order('effective_from',{ascending:false}),
+    db.from('payroll_items').select('id,payroll_run_id,payment_status,paid_amount,advance_principal_paid')
   ]);
-  allEmps=emps||[];salaryConfigs=configs||[];payrollRuns=runs||[];
+  const loadError=employeeResult.error||salaryResult.error||runResult.error||patternResult.error||paymentResult.error;
+  if(loadError){alert('โหลดข้อมูล Payroll ไม่สำเร็จ: '+loadError.message);return;}
+  allEmps=employeeResult.data||[];
+  salaryConfigs=salaryResult.data||[];
+  payrollRuns=runResult.data||[];
+  allWorkPatterns=patternResult.data||[];
+  paymentTracking=paymentResult.data||[];
 
   const advSel=document.getElementById('adv-emp');
-  allEmps.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.name;advSel.appendChild(o);});
+  allEmps.filter(e=>e.payroll_eligible!==false).forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.name;advSel.appendChild(o);});
 
   loadSummary();loadRuns();if(isOwner)loadSalaryEmpList();loadAdvanceList();
 }
@@ -403,7 +491,7 @@ async function loadSummary(){
 
   let totalGross=0,totalNet=0,totalDed=0,totalOT=0;
   // ถ้าไม่ใช่ owner แสดงเฉพาะพนักงานตัวเอง
-  const visibleEmps=isOwner?allEmps:allEmps.filter(e=>e.id===currentUser?.id);
+  const visibleEmps=(isOwner?allEmps:allEmps.filter(e=>e.id===currentUser?.id)).filter(e=>e.payroll_eligible!==false);
   const html=visibleEmps.map((emp,i)=>{
     const cfg=salaryConfigs.find(c=>c.employee_id===emp.id);
     const base=cfg?.base_salary||0;
@@ -455,6 +543,55 @@ function countWorkDays(start,end){
   let count=0;const d=new Date(start);
   while(d<=end){const day=d.getDay();if(day!==0&&day!==6)count++;d.setDate(d.getDate()+1);}
   return count;
+}
+
+function safeExportName(name){
+  return String(name||'payslip').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
+}
+
+function escapeHtml(str){
+  return String(str||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function openPayslipPrintView(contentId,title,filename){
+  const source=document.getElementById(contentId);
+  if(!source||!source.innerHTML.trim()){alert('ยังไม่มีสลิปสำหรับส่งออก');return;}
+  const win=window.open('','_blank','width=820,height=920');
+  if(!win){alert('กรุณาอนุญาต popup เพื่อส่งออก PDF');return;}
+  const cleanTitle=escapeHtml(title||'Payslip');
+  win.document.write(`<!doctype html><html lang="th"><head><meta charset="UTF-8">
+    <title>${cleanTitle}</title>
+    <style>
+      *{box-sizing:border-box}
+      body{margin:0;background:#f5f6fa;color:#1A1A2E;font-family:'Noto Sans Thai','Helvetica Neue',Arial,sans-serif;font-size:13px}
+      .sheet{width:min(720px,100%);margin:24px auto;background:#fff;padding:28px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+      .brand{font-size:18px;font-weight:800;color:#0D7A65;margin-bottom:4px}
+      .title{font-size:14px;font-weight:700;margin-bottom:18px;color:#4A4A6A}
+      table.ps{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+      table.ps td{padding:8px 10px;border-bottom:1px solid #E8E9F0}
+      table.ps td:last-child{text-align:right;font-weight:600}
+      table.ps tr.section td{background:#F0FBF8;font-weight:700;color:#0D7A65;font-size:11px;letter-spacing:.4px}
+      table.ps tr.total-row td{font-weight:800;font-size:14px;color:#1A1A2E}
+      table.ps tr.net-row td{background:#0B9E82;color:#fff;font-weight:800;font-size:15px}
+      .actions{position:sticky;bottom:0;background:#fff;border-top:1px solid #E8E9F0;padding:12px;text-align:center}
+      button{padding:10px 18px;border-radius:8px;border:none;background:#0B9E82;color:#fff;font-weight:700;cursor:pointer}
+      @media print{body{background:#fff}.sheet{width:100%;margin:0;padding:0;box-shadow:none;border-radius:0}.actions{display:none}@page{size:A4;margin:14mm}}
+    </style></head><body>
+      <div class="sheet">
+        <div class="brand">PAYROLL LOEI SMART GROUP</div>
+        <div class="title">${cleanTitle}</div>
+        ${source.innerHTML}
+      </div>
+      <div class="actions"><button onclick="window.print()">ดาวน์โหลด PDF / พิมพ์</button></div>
+      <script>document.title=${JSON.stringify(safeExportName(filename||title||'payslip'))};setTimeout(()=>window.print(),250);<\/script>
+    </body></html>`);
+  win.document.close();
+}
+
+function exportPayslipPdf(){
+  const title=document.getElementById('ps-emp-name')?.textContent||'Payslip';
+  const ym=document.getElementById('sum-month')?.value||'';
+  openPayslipPrintView('payslip-content',title,`${title}-${ym}`);
 }
 
 // ──────────── PAYSLIP ────────────
@@ -519,8 +656,15 @@ function loadRuns(){
   const el=document.getElementById('runs-list');
   if(!payrollRuns.length){el.innerHTML='<div class="loading-text">ยังไม่มีรอบจ่าย</div>';return;}
   el.innerHTML=payrollRuns.map(r=>{
-    const badgeCls=r.status==='paid'?'badge-paid':r.status==='confirmed'?'badge-confirmed':'badge-draft';
-    const badgeTxt=r.status==='paid'?'✅ จ่ายแล้ว':r.status==='confirmed'?'✔ ยืนยันแล้ว':'📝 Draft';
+    const tracked=paymentTracking.filter(item=>item.payroll_run_id===r.id);
+    const paidCount=tracked.filter(item=>item.payment_status==='paid').length;
+    const pendingCount=tracked.filter(item=>item.payment_status==='pending').length;
+    const badgeCls=r.run_type==='advance'&&r.status!=='draft'
+      ?(pendingCount?(paidCount?'badge-confirmed':'badge-pending'):'badge-paid')
+      :(r.status==='paid'?'badge-paid':r.status==='confirmed'?'badge-confirmed':'badge-draft');
+    const badgeTxt=r.run_type==='advance'&&r.status!=='draft'
+      ?(pendingCount?(paidCount?'↗ โอนบางส่วน':'⏳ รอโอน'):'✅ จัดการครบ')
+      :(r.status==='paid'?'✅ จ่ายแล้ว':r.status==='confirmed'?'✔ ยืนยันแล้ว':'📝 Draft');
     return`<div class="run-row">
       <div style="flex:1">
         <div style="font-weight:700">${thaiM(r.year_month)} — ${r.run_type==='advance'?'รอบ 1 (วันที่ 15)':'รอบ 2 (สิ้นเดือน)'}</div>
@@ -537,36 +681,200 @@ function loadRuns(){
 
 async function showRunDetail(runId){
   const run=payrollRuns.find(r=>r.id===runId);if(!run)return;
+  selectedPayrollRun=run;
   document.getElementById('rd-title').textContent=`${thaiM(run.year_month)} — ${run.run_type==='advance'?'รอบ 1 (วันที่ 15)':'รอบ 2 (สิ้นเดือน)'}`;
   document.getElementById('rd-summary').textContent='';
   document.getElementById('rd-list').innerHTML='<div class="loading-text">กำลังโหลด...</div>';
   openModal('modal-run-detail');
-  const{data:items,error}=await db.from('payroll_items').select('*').eq('payroll_run_id',runId);
+  let{data:items,error}=await db.from('payroll_items').select('*').eq('payroll_run_id',runId);
   if(error){document.getElementById('rd-list').innerHTML=`<div style="color:#E53935;padding:12px">โหลดไม่ได้: ${error.message}</div>`;return;}
+  const eligibleEmployees=eligibleEmployeesForRun(run);
+  const existingEmployeeIds=new Set((items||[]).map(item=>item.employee_id));
+  const missingEmployees=eligibleEmployees.filter(employee=>!existingEmployeeIds.has(employee.id));
+  if(run.status==='draft'&&missingEmployees.length){
+    try{
+      await calcAndSaveItems(run,missingEmployees);
+      const refreshed=await db.from('payroll_items').select('*').eq('payroll_run_id',runId);
+      if(refreshed.error)throw refreshed.error;
+      items=refreshed.data||[];
+    }catch(repairError){
+      document.getElementById('rd-list').innerHTML=`<div style="color:#E53935;padding:12px">สร้างรายการพนักงานไม่ครบ: ${repairError.message}</div>`;
+      return;
+    }
+  }
   if(!items||!items.length){document.getElementById('rd-list').innerHTML='<div class="loading-text">ไม่มีข้อมูลในรอบนี้</div>';return;}
-  let totalNet=0;
-  const rows=items.map((it,i)=>{
+  currentRunItems=items;
+  let totalNet=0,totalPaid=0,paidCount=0,pendingCount=0,cancelledCount=0;
+  const rows=[...items].sort((a,b)=>{
+    const nameA=allEmps.find(e=>e.id===a.employee_id)?.name||'';
+    const nameB=allEmps.find(e=>e.id===b.employee_id)?.name||'';
+    return nameA.localeCompare(nameB,'th');
+  }).map((it,i)=>{
     const emp=allEmps.find(e=>e.id===it.employee_id);
     const name=emp?emp.name:'(ไม่พบพนักงาน)';
     totalNet+=it.net_pay||0;
+    if(it.payment_status==='paid'){totalPaid+=Number(it.paid_amount||0);paidCount++;}
+    else if(it.payment_status==='cancelled')cancelledCount++;
+    else pendingCount++;
     const[bg,tx]=AV[i%5];
+    const paymentBadge=it.payment_status==='paid'
+      ?`<span class="badge badge-paid">โอนแล้ว ฿${fmt(it.paid_amount)}</span>`
+      :it.payment_status==='cancelled'
+        ?'<span class="badge badge-cancelled">ยกเลิก</span>'
+        :'<span class="badge badge-pending">รอโอน</span>';
+    const paymentActions=run.run_type==='advance'&&run.status!=='draft'&&it.payment_status==='pending'
+      ?`<div style="display:flex;gap:6px;margin-left:8px"><button type="button" class="btn btn-green" style="padding:8px 10px;min-height:44px" onclick="setPaymentStatus('${it.id}','paid')">โอนแล้ว</button><button type="button" class="btn btn-gray" style="padding:8px 10px;min-height:44px" onclick="setPaymentStatus('${it.id}','cancelled')">ยกเลิก</button></div>`:'';
     return`<div class="emp-row">
       <div class="av" style="background:${bg};color:${tx}">${name.substring(0,2)}</div>
       <div style="flex:1">
         <div class="emp-name">${name}</div>
-        <div class="emp-sub">รับ ฿${fmt(it.gross_pay)} · หัก ฿${fmt(it.total_deduct)}</div>
+        <div class="emp-sub">รับ ฿${fmt(it.gross_pay)} · หัก ฿${fmt(it.total_deduct)}${it.manual_income_adjustment||it.manual_deduction_adjustment?` · ปรับรอบนี้ +฿${fmt(it.manual_income_adjustment)} / -฿${fmt(it.manual_deduction_adjustment)}`:''}</div>
+        ${run.run_type==='advance'?`<div style="margin-top:5px">${paymentBadge}${it.payment_status==='paid'?` <span style="font-size:10px;color:var(--text3)">หักสิ้นเดือน ฿${fmt(it.advance_principal_paid)}</span>`:''}</div>`:''}
       </div>
       <div class="salary-val">฿${fmt(it.net_pay)}</div>
+      ${run.status==='draft'?`<button type="button" class="btn btn-teal" style="margin-left:8px;padding:8px 12px;min-height:44px" onclick="openPayrollAdjustment('${it.id}')">แก้ยอด</button>`:''}
+      ${paymentActions}
     </div>`;
   }).join('');
-  document.getElementById('rd-summary').textContent=`พนักงาน ${items.length} คน · รวมจ่ายสุทธิ ฿${fmt(totalNet)}`;
+  const missingAfterRepair=eligibleEmployees.filter(employee=>!new Set(items.map(item=>item.employee_id)).has(employee.id)).length;
+  document.getElementById('rd-summary').textContent=run.run_type==='advance'
+    ?`พนักงาน ${items.length}/${eligibleEmployees.length} คน · โอนแล้ว ${paidCount} · รอโอน ${pendingCount} · ยกเลิก ${cancelledCount} · โอนจริง ฿${fmt(totalPaid)}`
+    :`พนักงาน ${items.length}/${eligibleEmployees.length} คน · รวมจ่ายสุทธิ ฿${fmt(totalNet)}${missingAfterRepair?' · รายการไม่ครบ '+missingAfterRepair+' คน':''}`;
   document.getElementById('rd-list').innerHTML=rows;
+}
+
+async function setPaymentStatus(itemId,status){
+  const item=currentRunItems.find(row=>row.id===itemId);if(!item||item.payment_status!=='pending')return;
+  const employee=allEmps.find(emp=>emp.id===item.employee_id);
+  const action=status==='paid'?'ยืนยันว่าโอนเงินจริงแล้ว':'ยกเลิกการจ่าย';
+  if(!confirm(`${action} — ${employee?.name||'พนักงาน'}?`))return;
+  let payment_note='';
+  if(status==='cancelled'){
+    payment_note=prompt('กรุณาระบุเหตุผลที่ยกเลิกการจ่าย')?.trim()||'';
+    if(!payment_note){alert('ต้องระบุเหตุผลการยกเลิก');return;}
+  }
+  const{data,error}=await db.from('payroll_items').update({
+    payment_status:status,payment_note,payment_recorded_by:currentUser.id
+  }).eq('id',itemId).select('*').single();
+  if(error){alert('บันทึกสถานะการโอนไม่สำเร็จ: '+error.message);return;}
+  currentRunItems=currentRunItems.map(row=>row.id===itemId?data:row);
+  paymentTracking=paymentTracking.map(row=>row.id===itemId?{
+    id:data.id,payroll_run_id:data.payroll_run_id,payment_status:data.payment_status,
+    paid_amount:data.paid_amount,advance_principal_paid:data.advance_principal_paid
+  }:row);
+  loadRuns();
+  await showRunDetail(data.payroll_run_id);
+}
+
+function openPayrollAdjustment(itemId){
+  const item=currentRunItems.find(row=>row.id===itemId);if(!item||selectedPayrollRun?.status!=='draft')return;
+  selectedPayrollItem=item;
+  const employee=allEmps.find(emp=>emp.id===item.employee_id);
+  document.getElementById('pa-title').textContent=`ปรับยอด — ${employee?.name||'พนักงาน'}`;
+  document.getElementById('pa-income').value=Number(item.manual_income_adjustment||0);
+  document.getElementById('pa-deduct').value=Number(item.manual_deduction_adjustment||0);
+  document.getElementById('pa-reason').value=item.adjustment_reason||'';
+  updatePayrollAdjustmentPreview();
+  openModal('modal-payroll-adjustment');
+}
+
+function updatePayrollAdjustmentPreview(){
+  if(!selectedPayrollItem)return;
+  const oldIncome=Number(selectedPayrollItem.manual_income_adjustment||0);
+  const oldDeduct=Number(selectedPayrollItem.manual_deduction_adjustment||0);
+  const baseNet=Number(selectedPayrollItem.net_pay||0)-oldIncome+oldDeduct;
+  const income=Math.max(0,Number(document.getElementById('pa-income').value)||0);
+  const deduct=Math.max(0,Number(document.getElementById('pa-deduct').value)||0);
+  const change=income-deduct;
+  document.getElementById('pa-base-net').textContent='฿'+fmt(baseNet);
+  document.getElementById('pa-change').textContent=(change>=0?'+':'-')+'฿'+fmt(Math.abs(change));
+  document.getElementById('pa-new-net').textContent='฿'+fmt(baseNet+change);
+}
+
+document.getElementById('pa-income').addEventListener('input',updatePayrollAdjustmentPreview);
+document.getElementById('pa-deduct').addEventListener('input',updatePayrollAdjustmentPreview);
+
+async function savePayrollAdjustment(){
+  if(!selectedPayrollItem||selectedPayrollRun?.status!=='draft')return;
+  const income=Math.max(0,Number(document.getElementById('pa-income').value)||0);
+  const deduct=Math.max(0,Number(document.getElementById('pa-deduct').value)||0);
+  const reason=document.getElementById('pa-reason').value.trim();
+  if(!reason){alert('กรุณาระบุเหตุผลการแก้ไข');document.getElementById('pa-reason').focus();return;}
+  const button=document.getElementById('pa-save');
+  button.disabled=true;button.textContent='กำลังบันทึก...';
+  const{data,error}=await db.from('payroll_items').update({
+    manual_income_adjustment:income,
+    manual_deduction_adjustment:deduct,
+    adjustment_reason:reason
+  }).eq('id',selectedPayrollItem.id).select('*').single();
+  button.disabled=false;button.textContent='บันทึกยอดใหม่';
+  if(error){alert('แก้ยอดไม่ได้: '+error.message);return;}
+  selectedPayrollItem=data;
+  closeModal('modal-payroll-adjustment');
+  await showRunDetail(selectedPayrollRun.id);
 }
 
 // ──────────── CREATE RUN ────────────
 function openRunModal(){
   updateRunDefaults();
   openModal('modal-run');
+}
+
+function runFormData(){
+  return{
+    year_month:document.getElementById('run-month').value,
+    run_type:document.getElementById('run-type').value,
+    pay_date:document.getElementById('run-paydate').value
+  };
+}
+
+function hasScheduleForPeriod(employee,start,end){
+  if(employee.attendance_required===false)return true;
+  const first=employee.start_date&&employee.start_date>start?employee.start_date:start;
+  const last=employee.resigned_at&&employee.resigned_at<end?employee.resigned_at:end;
+  const day=new Date(first+'T00:00:00');
+  const lastDay=new Date(last+'T00:00:00');
+  while(day<=lastDay){
+    if(!workPatternForDate(allWorkPatterns,employee.id,dateStr(day)))return false;
+    day.setDate(day.getDate()+1);
+  }
+  return true;
+}
+
+function getRunReadiness(run){
+  if(!run.year_month)return{ok:false,eligible:[],missingSalary:[],missingSchedule:[],message:'กรุณาเลือกเดือน'};
+  const[y,m]=run.year_month.split('-');
+  const start=`${y}-${m}-01`;
+  const monthEnd=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
+  const end=run.run_type==='advance'&&run.pay_date&&run.pay_date<monthEnd?run.pay_date:monthEnd;
+  const eligible=eligibleEmployeesForRun(run);
+  const missingSalary=eligible.filter(emp=>!salaryConfigs.some(cfg=>cfg.employee_id===emp.id));
+  const missingSchedule=run.run_type==='final'?eligible.filter(emp=>!hasScheduleForPeriod(emp,start,end)):[];
+  return{ok:eligible.length>0&&!missingSalary.length&&!missingSchedule.length,eligible,missingSalary,missingSchedule};
+}
+
+function renderRunReadiness(){
+  const box=document.getElementById('run-readiness');
+  const button=document.getElementById('btn-create-run');
+  if(!box||!button)return;
+  const readiness=getRunReadiness(runFormData());
+  box.className='run-readiness '+(readiness.ok?'ready':'blocked');
+  box.replaceChildren();
+  const title=document.createElement('strong');
+  title.textContent=readiness.ok
+    ?`พร้อมสร้างรอบสำหรับพนักงาน ${readiness.eligible.length} คน`
+    :'ยังสร้างรอบไม่ได้ — กรุณาแก้ข้อมูลต่อไปนี้';
+  box.appendChild(title);
+  const problems=[];
+  if(!readiness.eligible.length)problems.push('ไม่พบพนักงานที่อยู่ในรอบจ่าย');
+  if(readiness.missingSalary.length)problems.push(`ยังไม่ตั้งค่าเงินเดือน ${readiness.missingSalary.length} คน: ${readiness.missingSalary.map(e=>e.name).join(', ')}`);
+  if(readiness.missingSchedule.length)problems.push(`ตารางวันทำงานไม่ครอบคลุมรอบจ่าย ${readiness.missingSchedule.length} คน: ${readiness.missingSchedule.map(e=>e.name).join(', ')}`);
+  if(problems.length){
+    const list=document.createElement('ul');
+    problems.forEach(message=>{const item=document.createElement('li');item.textContent=message;list.appendChild(item);});
+    box.appendChild(list);
+  }
+  button.disabled=!readiness.ok;
 }
 
 function updateRunDefaults(){
@@ -586,6 +894,7 @@ function updateRunDefaults(){
     document.getElementById('run-ot-start').value=`${prevY}-${String(prevM).padStart(2,'0')}-21`;
     document.getElementById('run-ot-end').value=`${y}-${m}-20`;
   }
+  renderRunReadiness();
 }
 
 async function createRun(){
@@ -596,15 +905,23 @@ async function createRun(){
   const ot_start=document.getElementById('run-ot-start').value||null;
   const ot_end=document.getElementById('run-ot-end').value||null;
   if(!ym||!pay_date){alert('กรุณากรอกข้อมูลให้ครบ');return;}
+  const readiness=getRunReadiness({year_month:ym,run_type,pay_date});
+  if(!readiness.ok){renderRunReadiness();alert('ยังสร้างรอบจ่ายไม่ได้ กรุณาแก้ข้อมูลที่ระบบแจ้งก่อน');return;}
 
   const{data:run,error}=await db.from('payroll_runs').insert({
     year_month:ym,run_type,pay_date,note,
-    ot_period_start:ot_start,ot_period_end:ot_end,status:'draft'
+    ot_period_start:ot_start,ot_period_end:ot_end,status:'draft',created_by:currentUser.id
   }).select().single();
   if(error){alert('สร้างรอบไม่ได้: '+error.message);return;}
 
-  // คำนวณและบันทึก payroll items
-  await calcAndSaveItems(run);
+  // คำนวณและบันทึก payroll items ต้องสำเร็จครบก่อนจึงถือว่าสร้างรอบสำเร็จ
+  try{
+    await calcAndSaveItems(run);
+  }catch(itemError){
+    await db.from('payroll_runs').delete().eq('id',run.id);
+    alert('สร้างรายการพนักงานไม่สำเร็จ จึงยกเลิกรอบนี้: '+itemError.message);
+    return;
+  }
   payrollRuns=[run,...payrollRuns];
   loadRuns();
   closeModal('modal-run');
@@ -612,48 +929,93 @@ async function createRun(){
   alert(`✅ สร้างรอบจ่าย ${thaiM(ym)} สำเร็จ`);
 }
 
-async function calcAndSaveItems(run){
-  const[y,m]=run.year_month.split('-');
+async function calcAndSaveItems(run,employees=null){
+  const[y,m]=run.year_month.trim().split('-');
   const start=`${y}-${m}-01`;const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
-  const[{data:atts},{data:leaves}]=await Promise.all([
+  const periodEnd=run.run_type==='advance'&&run.pay_date<end?run.pay_date:end;
+  const targetEmployees=employees||eligibleEmployeesForRun(run);
+  if(!targetEmployees.length)throw new Error('ไม่พบพนักงานที่อยู่ในรอบจ่าย');
+  const missingSalary=targetEmployees.filter(emp=>!salaryConfigs.some(cfg=>cfg.employee_id===emp.id));
+  if(missingSalary.length)throw new Error('ยังไม่ตั้งค่าเงินเดือน: '+missingSalary.map(emp=>emp.name).join(', '));
+  const advancePaymentQuery=run.run_type==='final'
+    ?db.from('payroll_items')
+      .select('employee_id,payment_status,advance_principal_paid,payroll_runs!inner(year_month,run_type,status)')
+      .eq('payroll_runs.year_month',run.year_month)
+      .eq('payroll_runs.run_type','advance')
+      .in('payroll_runs.status',['confirmed','paid'])
+      .eq('payment_status','paid')
+    :Promise.resolve({data:[],error:null});
+  const[{data:atts,error:attendanceError},{data:leaves,error:leaveError},{data:workPatterns,error:patternError},{data:advancePayments,error:advancePaymentError}]=await Promise.all([
     db.from('attendance').select('*').gte('work_date',start).lte('work_date',end),
-    db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end)
+    db.from('leave_requests').select('*').eq('status','approved').lte('start_date',end).gte('end_date',start),
+    db.from('employee_work_patterns').select('*').lte('effective_from',end),
+    advancePaymentQuery
   ]);
+  if(attendanceError)throw attendanceError;
+  if(leaveError)throw leaveError;
+  if(patternError)throw patternError;
+  if(advancePaymentError)throw advancePaymentError;
 
-  const items=allEmps.map(emp=>{
+  const items=targetEmployees.map(emp=>{
     const cfg=salaryConfigs.find(c=>c.employee_id===emp.id);
     const base=cfg?.base_salary||0;
     const empAtts=(atts||[]).filter(a=>a.employee_id===emp.id&&a.check_in);
     const workDays=empAtts.length;
     const unpaidDays=(leaves||[]).filter(l=>l.employee_id===emp.id&&l.leave_type==='unpaid').reduce((s,l)=>s+(l.days||0),0);
-    const proratedBase=Math.round((base-base/30*unpaidDays)*100)/100;
-    const posPay=cfg?.position_pay||0;
-    const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
-    const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
-    const otherPay=cfg?.other_pay||0;
+    const daysInMonth=new Date(y,m,0).getDate();
+    const employedFrom=emp.start_date&&emp.start_date>start?emp.start_date:start;
+    const employedUntil=emp.resigned_at&&emp.resigned_at<end?emp.resigned_at:end;
+    const employedDays=Math.max(0,Math.round((new Date(employedUntil+'T00:00:00')-new Date(employedFrom+'T00:00:00'))/86400000)+1);
+    const employmentRatio=run.run_type==='final'?Math.min(1,employedDays/daysInMonth):1;
+    const proratedBase=Math.max(0,Math.round((base*employmentRatio-base/30*unpaidDays)*100)/100);
+    const prorateMonthly=value=>Math.round((Number(value||0)*employmentRatio)*100)/100;
+    const posPay=prorateMonthly(cfg?.position_pay);
+    const licensePay=cfg?.driving_license?prorateMonthly(cfg?.license_pay):0;
+    const comm=cfg?.commission_type==='fixed'?prorateMonthly(cfg?.commission_value):0;
+    const otherPay=prorateMonthly(cfg?.other_pay);
     // รายการหักทั้งหมด (กรอกเอง) — หักเฉพาะรอบ final
     const manualDeduct=run.run_type==='final'?((cfg?.other_deduct||0)+(cfg?.other_deduct2||0)+(cfg?.other_deduct3||0)):0;
     const otMins=run.run_type==='final'
       ?(atts||[]).filter(a=>a.employee_id===emp.id&&a.work_date>=run.ot_period_start&&a.work_date<=run.ot_period_end).reduce((s,a)=>s+(a.ot_minutes||0),0)
       :0;
     const otPay=otMins?Math.round(otMins/60*base/30/8*1.5*100)/100:0;
-    const advancePaid=run.run_type==='final'?ADVANCE_AMOUNT:0;
+    const advancePaid=run.run_type==='final'
+      ?(advancePayments||[]).filter(payment=>payment.employee_id===emp.id)
+        .reduce((sum,payment)=>sum+Number(payment.advance_principal_paid||0),0)
+      :0;
     const lateCount=empAtts.filter(a=>a.is_late).length;
-    const absentCount=0;
+    let absentCount=0,scheduledDays=0;
+    const day=new Date(start+'T00:00:00');
+    const lastDay=new Date(periodEnd+'T00:00:00');
+    while(day<=lastDay){
+      const workDate=dateStr(day);
+      if(emp.attendance_required!==false&&employeeEligibleForPeriod(emp,workDate,workDate)){
+        const pattern=workPatternForDate(workPatterns,emp.id,workDate);
+        if(pattern&&!pattern.weekly_off_days.includes(day.getDay())){
+          scheduledDays++;
+          const hasAttendance=empAtts.some(a=>a.work_date===workDate);
+          const hasApprovedLeave=(leaves||[]).some(l=>l.employee_id===emp.id&&l.start_date<=workDate&&l.end_date>=workDate);
+          if(!hasAttendance&&!hasApprovedLeave)absentCount++;
+        }
+      }
+      day.setDate(day.getDate()+1);
+    }
     const gross=run.run_type==='advance'?ADVANCE_AMOUNT:(proratedBase+posPay+licensePay+comm+otherPay+otPay);
-    const totalDeduct=manualDeduct+(run.run_type==='final'?ADVANCE_AMOUNT:0);
+    const totalDeduct=manualDeduct+advancePaid;
     const net=gross-totalDeduct;
     return{
       payroll_run_id:run.id,employee_id:emp.id,
       base_salary:proratedBase,position_pay:posPay,license_pay:licensePay,commission:comm,
-      ot_pay:otPay,advance_paid:advancePaid,
-      social_security:0,advance_deduct:0,other_deduct:manualDeduct,
+      other_income:otherPay,ot_pay:otPay,advance_paid:advancePaid,
+      social_security:0,advance_deduct:advancePaid,other_deduct:manualDeduct,
       gross_pay:gross,total_deduct:totalDeduct,
-      net_pay:net,work_days:workDays,total_days_in_month:30,
+      net_pay:net,work_days:workDays,total_days_in_month:scheduledDays,
       late_count:lateCount,absent_count:absentCount,ot_minutes:otMins
     };
   });
-  await db.from('payroll_items').insert(items);
+  const{error}=await db.from('payroll_items').insert(items);
+  if(error)throw error;
+  return items.length;
 }
 
 async function deleteRun(id){
@@ -670,14 +1032,34 @@ async function deleteRun(id){
 async function recalcRun(id){
   if(!confirm('คำนวณใหม่? ข้อมูลเดิมในรอบนี้จะถูกลบแล้วคำนวณใหม่จากข้อมูลปัจจุบัน'))return;
   const run=payrollRuns.find(r=>r.id===id);if(!run)return;
+  const readiness=getRunReadiness(run);
+  if(!readiness.ok){alert('คำนวณใหม่ไม่ได้ กรุณาแก้ข้อมูลเงินเดือนและตารางวันทำงานให้ครบก่อน');return;}
+  const{data:backupItems,error:backupError}=await db.from('payroll_items').select('*').eq('payroll_run_id',id);
+  if(backupError){alert('สำรองรายการเดิมก่อนคำนวณไม่สำเร็จ: '+backupError.message);return;}
   const{error}=await db.from('payroll_items').delete().eq('payroll_run_id',id);
   if(error){alert('ลบรายการเดิมไม่ได้: '+error.message);return;}
-  await calcAndSaveItems(run);
-  alert('✅ คำนวณใหม่เรียบร้อย');
+  try{
+    await calcAndSaveItems(run);
+    alert('✅ คำนวณใหม่เรียบร้อย');
+    await showRunDetail(id);
+  }catch(calcError){
+    const{error:restoreError}=backupItems?.length?await db.from('payroll_items').insert(backupItems):{error:null};
+    if(restoreError){alert('คำนวณใหม่ไม่สำเร็จ และกู้รายการเดิมไม่ได้ กรุณาหยุดใช้งานรอบนี้และติดต่อผู้ดูแล: '+restoreError.message);return;}
+    alert('คำนวณใหม่ไม่สำเร็จ ระบบกู้รายการเดิมกลับแล้ว: '+calcError.message);
+  }
 }
 
 async function confirmRun(id){
-  if(!confirm('ยืนยันรอบจ่ายนี้? จะไม่สามารถแก้ไขได้'))return;
+  const run=payrollRuns.find(r=>r.id===id);if(!run||run.status!=='draft')return;
+  const readiness=getRunReadiness(run);
+  if(!readiness.ok){alert('ยังยืนยันรอบไม่ได้ กรุณาแก้ข้อมูลเงินเดือนและตารางวันทำงานให้ครบก่อน');return;}
+  const{data:items,error:itemError}=await db.from('payroll_items').select('employee_id').eq('payroll_run_id',id);
+  if(itemError){alert('ตรวจรายการพนักงานไม่ได้: '+itemError.message);return;}
+  const expectedIds=new Set(readiness.eligible.map(emp=>emp.id));
+  const actualIds=new Set((items||[]).map(item=>item.employee_id));
+  const rosterComplete=expectedIds.size===actualIds.size&&[...expectedIds].every(employeeId=>actualIds.has(employeeId));
+  if(!rosterComplete){alert('ยังยืนยันรอบไม่ได้ รายการพนักงานไม่ครบหรือไม่ตรงกับรอบ กรุณากดคำนวณใหม่');return;}
+  if(!confirm(`ยืนยันรอบจ่ายสำหรับพนักงาน ${actualIds.size} คน? หลังยืนยันแล้วจะไม่สามารถแก้ไขได้`))return;
   const{error}=await db.from('payroll_runs').update({status:'confirmed',confirmed_at:new Date().toISOString()}).eq('id',id);
   if(error){alert('ยืนยันไม่ได้: '+error.message);return;}
   const r=payrollRuns.find(x=>x.id===id);if(r)r.status='confirmed';
@@ -687,7 +1069,7 @@ async function confirmRun(id){
 // ──────────── SALARY CONFIG ────────────
 function loadSalaryEmpList(){
   const el=document.getElementById('salary-emp-list');
-  el.innerHTML=allEmps.map((emp,i)=>{
+  el.innerHTML=allEmps.filter(emp=>emp.payroll_eligible!==false).map((emp,i)=>{
     const cfg=salaryConfigs.find(c=>c.employee_id===emp.id);
     const[bg,tx]=AV[i%5];
     return`<div class="emp-row" onclick="openSalaryModal('${emp.id}')">
@@ -824,7 +1206,7 @@ async function approveAdv(id){
 }
 
 // close modals on backdrop click
-['modal-run','modal-salary','modal-advance','modal-payslip','modal-run-detail'].forEach(id=>{
+['modal-run','modal-salary','modal-advance','modal-payslip','modal-run-detail','modal-payroll-adjustment'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){if(e.target===this)closeModal(id);});
 });
 

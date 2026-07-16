@@ -2,9 +2,9 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<link rel="apple-touch-icon" sizes="180x180" href="lsmg-180.png">
-<link rel="apple-touch-icon-precomposed" sizes="180x180" href="lsmg-180.png">
-<link rel="icon" type="image/png" href="lsmg-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/brand/lsmg-180.png">
+<link rel="apple-touch-icon-precomposed" sizes="180x180" href="assets/icons/brand/lsmg-180.png">
+<link rel="icon" type="image/png" href="assets/icons/brand/lsmg-192.png">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0B9E82">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +15,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>LOEI SMART GROUP - Time Attendance</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4"></script>
+<script src="auth-helpers.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -52,6 +53,10 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
 .btn-login{width:100%;padding:14px;border-radius:var(--r3);border:none;background:linear-gradient(135deg,var(--teal),var(--teal2));color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;box-shadow:0 4px 12px rgba(11,158,130,0.35)}
 .btn-login:active{transform:scale(0.98)}
 .login-err{background:var(--red-light);color:var(--red);font-size:12px;padding:10px 14px;border-radius:var(--r3);margin-top:12px;text-align:center;display:none;border:1px solid #FFCDD2}
+.login-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:18px;padding:4px;background:var(--gray);border-radius:12px}
+.login-mode{min-height:44px;border:0;border-radius:9px;background:transparent;color:var(--text2);font-weight:600;cursor:pointer}
+.login-mode.active{background:var(--white);color:var(--teal2);box-shadow:var(--shadow)}
+.login-help{margin:-4px 0 14px;color:var(--text3);font-size:11px;line-height:1.5;text-align:center}
 
 /* ===== APP LAYOUT ===== */
 #screen-app{background:var(--gray)}
@@ -161,6 +166,19 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
 .leave-item{background:var(--white);border-radius:var(--r);padding:14px;margin-bottom:8px;box-shadow:var(--shadow)}
 .leave-item-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
 .leave-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
+.leave-summary-modal{width:min(960px,calc(100vw - 24px));max-width:960px;max-height:90vh}
+.leave-summary-toolbar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+.leave-summary-toolbar .modal-label{margin-top:0}
+.leave-summary-table-wrap{overflow:auto;max-height:58vh;border:1px solid var(--border);border-radius:12px;background:var(--white)}
+.leave-summary-table{width:100%;min-width:820px;border-collapse:collapse;font-size:12px}
+.leave-summary-table th{position:sticky;top:0;z-index:1;background:var(--teal-bg);color:var(--teal2);padding:10px 8px;border-bottom:2px solid var(--teal-light);white-space:nowrap;text-align:center}
+.leave-summary-table td{padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle}
+.leave-summary-table td.left{text-align:left;min-width:180px}
+.leave-balance{font-size:10px;color:var(--text3);margin-top:2px;white-space:nowrap}
+.leave-balance.warn{color:var(--red);font-weight:700}
+.leave-summary-cards{display:grid;grid-template-columns:repeat(4,minmax(110px,1fr));gap:8px;margin-bottom:12px}
+.leave-summary-card{background:var(--gray);border-radius:10px;padding:10px;text-align:center}
+@media(max-width:640px){.leave-summary-cards{grid-template-columns:repeat(2,1fr)}}
 .status-badge-pending{background:var(--orange-light);color:var(--orange)}
 .status-badge-approved{background:var(--green-light);color:var(--green)}
 .status-badge-rejected{background:var(--red-light);color:var(--red)}
@@ -236,9 +254,16 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
 .modal-input:focus{border-color:var(--teal);background:var(--white)}
 .modal-select{width:100%;padding:12px 14px;border-radius:var(--r3);border:1.5px solid var(--border);background:var(--gray);color:var(--text);outline:none}
 .modal-textarea{width:100%;padding:12px 14px;border-radius:var(--r3);border:1.5px solid var(--border);background:var(--gray);color:var(--text);outline:none;min-height:70px;resize:vertical;font-family:inherit}
+.weekly-off-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;margin-top:6px}
+.weekly-off-option{min-height:44px;display:flex;align-items:center;gap:8px;padding:9px 10px;border:1.5px solid var(--border);border-radius:var(--r3);background:var(--white);color:var(--text2);font-size:12px;font-weight:600;cursor:pointer}
+.weekly-off-option.selected{border-color:var(--teal);background:var(--teal-light);color:var(--teal2)}
+.weekly-off-option input{width:18px;height:18px;accent-color:var(--teal);flex-shrink:0}
+.schedule-helper{font-size:11px;line-height:1.5;color:var(--text3);padding:8px 10px;margin-top:8px;border-radius:8px;background:#FFF8E1}
 .btn-primary{width:100%;padding:14px;border-radius:var(--r3);border:none;background:linear-gradient(135deg,var(--teal),var(--teal2));color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:14px;box-shadow:0 4px 12px rgba(11,158,130,0.3)}
 .btn-primary:active{transform:scale(0.98)}
 .btn-secondary{width:100%;padding:12px;border-radius:var(--r3);border:1.5px solid var(--border);background:var(--white);color:var(--red);font-size:14px;font-weight:600;cursor:pointer;margin-top:8px}
+.payslip-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.payslip-actions .btn-primary,.payslip-actions .btn-secondary{margin-top:0}
 .approve-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
 .btn-reject{padding:13px;border-radius:var(--r3);border:1.5px solid #FFCDD2;background:var(--red-light);color:var(--red);font-size:14px;font-weight:700;cursor:pointer}
 .btn-approve{padding:13px;border-radius:var(--r3);border:none;background:linear-gradient(135deg,var(--teal),var(--teal2));color:#fff;font-size:14px;font-weight:700;cursor:pointer}
@@ -267,7 +292,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
 <div class="screen active" id="screen-login">
   <div class="login-box">
     <div class="login-logo">
-      <div class="login-logo-icon" style="background:none;padding:0;overflow:hidden"><img src="lsmg-512.png" style="width:72px;height:72px;border-radius:20px;object-fit:contain"></div>
+      <div class="login-logo-icon" style="background:none;padding:0;overflow:hidden"><img src="assets/icons/brand/lsmg-512.png" style="width:72px;height:72px;border-radius:20px;object-fit:contain"></div>
       <h1>LOEI SMART GROUP</h1>
       <p>ระบบลงเวลาพนักงาน เลยสมาร์ท กรุ๊ป</p>
       <div style="margin-top:10px;padding:8px 12px;border-radius:10px;background:linear-gradient(135deg,#E8F8F5,#FFF8E1)">
@@ -279,6 +304,11 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         </div>
       </div>
     </div>
+    <div class="login-modes" role="tablist" aria-label="วิธีเข้าสู่ระบบ">
+      <button class="login-mode active" id="login-mode-pin" type="button" onclick="setLoginMode('pin')">พนักงาน · PIN</button>
+      <button class="login-mode" id="login-mode-auth" type="button" onclick="setLoginMode('auth')">พนักงาน/HR/Owner · Email</button>
+    </div>
+    <div id="login-pin-fields">
     <div class="input-wrap">
       <label>เลือกชื่อพนักงาน</label>
       <select id="login-emp"><option value="">-- เลือกชื่อ --</option></select>
@@ -288,6 +318,21 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <input type="password" id="login-pin" maxlength="4" placeholder="••••" inputmode="numeric">
     </div>
     <button class="btn-login" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <p class="login-help">ระบบ PIN เปิดไว้ชั่วคราวระหว่างย้ายบัญชีพนักงาน</p>
+    </div>
+    <div id="login-auth-fields" hidden>
+      <div class="input-wrap">
+        <label for="login-email">อีเมล</label>
+        <input type="email" id="login-email" autocomplete="username" placeholder="name@example.com">
+      </div>
+      <div class="input-wrap">
+        <label for="login-password">รหัสผ่าน</label>
+        <input type="password" id="login-password" autocomplete="current-password" placeholder="รหัสผ่านอย่างน้อย 12 ตัวอักษร" onkeydown="if(event.key==='Enter')doAuthLogin()">
+      </div>
+      <button class="btn-login" id="auth-login-button" onclick="doAuthLogin()">เข้าสู่ระบบด้วย Email</button>
+      <button type="button" class="login-mode" id="auth-reset-button" style="width:100%;margin-top:10px" onclick="requestAuthPasswordReset()">ลืมรหัสผ่าน / ตั้งรหัสใหม่</button>
+      <p class="login-help">สำหรับบัญชีที่ได้รับคำเชิญ Supabase Auth แล้ว</p>
+    </div>
     <div class="login-err" id="login-err">PIN ไม่ถูกต้อง กรุณาลองใหม่</div>
   </div>
 </div>
@@ -324,27 +369,27 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
 
       <div class="menu-grid">
         <button class="menu-item" onclick="showPage('clock')">
-          <div class="menu-icon"><img src="01_clock_in.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="assets/icons/features/01_clock_in.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">ลงเวลา</div><div class="menu-sub">เช็คอิน / เช็คเอาท์</div></div>
         </button>
         <button class="menu-item" onclick="showPage('leave')">
-          <div class="menu-icon"><img src="07_leave_request.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="assets/icons/features/07_leave_request.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">ขอลา</div><div class="menu-sub">ยื่นคำขอลา</div></div>
         </button>
         <button class="menu-item" onclick="showPage('bonus')">
-          <div class="menu-icon"><img src="11_attendance_bonus.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="assets/icons/features/11_attendance_bonus.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">เบี้ยขยัน</div><div class="menu-sub">ดูยอดสะสม</div></div>
         </button>
         <button class="menu-item" onclick="showPage('report')">
-          <div class="menu-icon"><img src="08_report.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="assets/icons/features/08_report.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">รายงาน</div><div class="menu-sub">ประวัติลงเวลา</div></div>
         </button>
         <button class="menu-item" onclick="openMyPayslip()">
-          <div class="menu-icon"><img src="icon-512-payroll.png" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="assets/icons/payroll/icon-512-payroll.png" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">เงินเดือน</div><div class="menu-sub">ดูสลิปของฉัน</div></div>
         </button>
         <button class="menu-item" onclick="showPage('announce')" style="grid-column:span 2">
-          <div class="menu-icon"><img src="09_announcement.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
+          <div class="menu-icon"><img src="assets/icons/features/09_announcement.png?v=2" style="width:100%;height:100%;object-fit:contain"></div>
           <div><div class="menu-label">ประกาศ / ข่าวสาร</div><div class="menu-sub">ข้อมูลจาก HR รายเดือน</div></div>
         </button>
       </div>
@@ -375,12 +420,12 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <label class="modal-label" style="margin-top:0">หมายเหตุ (ถ้ามี)</label>
       <textarea class="note-input" id="checkin-note" placeholder="เพิ่มหมายเหตุ..."></textarea>
 
-      <button class="btn-checkin-big" id="btn-cin" onclick="openShiftSelect()"><img src="01_clock_in.png?v=2" style="width:28px;height:28px;border-radius:6px;object-fit:cover"> เช็คอิน <span id="btn-cin-time"></span></button>
+      <button class="btn-checkin-big" id="btn-cin" onclick="openShiftSelect()"><img src="assets/icons/features/01_clock_in.png?v=2" style="width:28px;height:28px;border-radius:6px;object-fit:cover"> เช็คอิน <span id="btn-cin-time"></span></button>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <button style="padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#F57F17,#E65100);color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px" id="btn-break-start" onclick="doBreakStart()"><img src="03_break_out.png?v=2" style="width:26px;height:26px;border-radius:6px;object-fit:cover"> ออกพัก <span id="btn-break-time"></span></button>
-        <button style="padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px" id="btn-break-end" onclick="doBreakEnd()"><img src="04_back_to_work.png?v=2" style="width:26px;height:26px;border-radius:6px;object-fit:cover"> กลับมาทำงาน</button>
+        <button style="padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#F57F17,#E65100);color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px" id="btn-break-start" onclick="doBreakStart()"><img src="assets/icons/features/03_break_out.png?v=2" style="width:26px;height:26px;border-radius:6px;object-fit:cover"> ออกพัก <span id="btn-break-time"></span></button>
+        <button style="padding:14px;border-radius:var(--r);border:none;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px" id="btn-break-end" onclick="doBreakEnd()"><img src="assets/icons/features/04_back_to_work.png?v=2" style="width:26px;height:26px;border-radius:6px;object-fit:cover"> กลับมาทำงาน</button>
       </div>
-      <button class="btn-checkout-big" id="btn-cout" onclick="doCheckout()"><img src="02_clock_out.png?v=2" style="width:28px;height:28px;border-radius:6px;object-fit:cover"> เช็คเอาท์ <span id="btn-cout-time"></span></button>
+      <button class="btn-checkout-big" id="btn-cout" onclick="doCheckout()"><img src="assets/icons/features/02_clock_out.png?v=2" style="width:28px;height:28px;border-radius:6px;object-fit:cover"> เช็คเอาท์ <span id="btn-cout-time"></span></button>
       <button id="btn-missed" onclick="doMissedCheckin()" style="width:100%;padding:12px;border-radius:var(--r);border:1.5px dashed var(--border);background:var(--white);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;display:none">⚠️ ลืมเช็คอิน? กดที่นี่</button>
 
       <div class="card">
@@ -422,7 +467,10 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         </div>
       </div>
 
-      <button class="btn-checkin-big" onclick="openLeaveModal()" style="margin-bottom:12px">+ ยื่นคำขอลา</button>
+      <div id="pin-leave-readonly" style="display:none;background:#E8F5F1;border:1px solid #8FD5C6;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#0D6B5A">
+        🔒 หน้านี้แสดงเฉพาะสรุปและประวัติวันลาของคุณ หากต้องการยื่นลา กรุณาติดต่อ Owner
+      </div>
+      <button class="btn-checkin-big" id="btn-open-leave" onclick="openLeaveModal()" style="margin-bottom:12px">+ ยื่นคำขอลา</button>
 
       <div class="card-title" style="padding:0 2px;margin-bottom:8px">📋 ประวัติการลา</div>
       <div id="leave-history"><div class="loading-text">กำลังโหลด...</div></div>
@@ -490,7 +538,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <div class="admin-section">
         <div class="admin-section-title">จัดการระบบ <span id="role-badge" style="font-size:10px;padding:2px 8px;border-radius:20px;background:#E3F2FD;color:#1565C0;font-weight:600;margin-left:6px"></span></div>
         <button class="admin-item" onclick="openModal('modal-emp')">
-          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="12_profile.png?v=2" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
+          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="assets/icons/features/12_profile.png?v=2" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
           <div class="admin-item-info"><div class="admin-item-label">พนักงาน</div><div class="admin-item-sub">เพิ่ม แก้ไข ลบพนักงาน</div></div>
           <div class="admin-item-arrow">›</div>
         </button>
@@ -505,12 +553,12 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
           <div class="admin-item-arrow">›</div>
         </button>
         <a href="time-report.html" class="admin-item" style="text-decoration:none;color:inherit">
-          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="08_report.png?v=2" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
+          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="assets/icons/features/08_report.png?v=2" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
           <div class="admin-item-info"><div class="admin-item-label">รายงานเวลาทำงาน</div><div class="admin-item-sub">ดูและ Export Excel รายบุคคล</div></div>
           <div class="admin-item-arrow">›</div>
         </a>
         <a class="admin-item" href="payroll.html" style="text-decoration:none;color:inherit">
-          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="icon-512-payroll.png" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
+          <div class="admin-item-icon" style="background:transparent;padding:0"><img src="assets/icons/payroll/icon-512-payroll.png" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
           <div class="admin-item-info"><div class="admin-item-label">ระบบเงินเดือน</div><div class="admin-item-sub">คำนวณ สลิป รอบจ่าย เบิกล่วงหน้า</div></div>
           <div class="admin-item-arrow">›</div>
         </a>
@@ -522,6 +570,11 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         <button class="admin-item" onclick="openLeaveManage()">
           <div class="admin-item-icon" style="background:#E3F2FD;font-size:22px">📅</div>
           <div class="admin-item-info"><div class="admin-item-label">จัดการวันลา</div><div class="admin-item-sub">ดู แก้ไข ลบรายการลาทั้งหมด</div></div>
+          <div class="admin-item-arrow">›</div>
+        </button>
+        <button class="admin-item" onclick="openLeaveSummary()">
+          <div class="admin-item-icon" style="background:#E8F5E9;font-size:22px">📊</div>
+          <div class="admin-item-info"><div class="admin-item-label">สรุปวันลาสะสม</div><div class="admin-item-sub">ลาป่วย ลากิจ ลาพักร้อน แยกรายพนักงาน</div></div>
           <div class="admin-item-arrow">›</div>
         </button>
         <button class="admin-item" onclick="openImportModal()">
@@ -583,6 +636,19 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         💵 ดูสลิปเงินเดือนของฉัน
       </button>
 
+      <div class="card" id="profile-account-card" style="margin-bottom:12px">
+        <div class="card-title">บัญชี Email สำหรับข้อมูลส่วนตัว</div>
+        <div id="profile-account-status" style="font-size:12px;color:var(--text3);margin-bottom:12px">กำลังตรวจสอบสถานะบัญชี...</div>
+        <div id="profile-account-request-fields">
+          <label class="modal-label" for="profile-account-email" style="margin-top:0">Email ส่วนตัว</label>
+          <input class="modal-input" type="email" id="profile-account-email" autocomplete="email" placeholder="name@example.com">
+          <label class="modal-label" for="profile-account-pin">ยืนยัน PIN ปัจจุบัน</label>
+          <input class="modal-input" type="password" id="profile-account-pin" maxlength="4" inputmode="numeric" autocomplete="current-password" placeholder="••••">
+          <div style="font-size:11px;color:var(--text3);line-height:1.5;margin:8px 0 12px">HR หรือ Owner จะตรวจสอบก่อนส่งคำเชิญตั้งรหัสผ่านไปยัง Email นี้</div>
+          <button class="btn-checkin-big" id="profile-account-request-button" type="button" onclick="requestEmployeeAccount()" style="font-size:14px;padding:13px">ส่งคำขอเชื่อมบัญชี</button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">🔐 เปลี่ยน PIN</div>
         <div style="font-size:12px;color:var(--text3);margin-bottom:12px">PIN ใช้สำหรับล็อกอินเข้าระบบ ควรเก็บไว้เป็นความลับ</div>
@@ -613,19 +679,23 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         <button onclick="loadMyPayslip()" style="padding:10px 16px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-weight:700;cursor:pointer">ดู</button>
       </div>
       <div id="my-payslip-content"><div style="text-align:center;padding:20px;color:var(--text3)">เลือกเดือนแล้วกด "ดู"</div></div>
+      <div class="payslip-actions">
+        <button class="btn-primary" onclick="exportMyPayslipPdf()">PDF / พิมพ์</button>
+        <button class="btn-secondary" onclick="closeModal('modal-my-payslip')">ปิด</button>
+      </div>
     </div>
   </div>
 
   <!-- BOTTOM NAV -->
   <div class="bottom-nav">
-    <button class="nav-item active" id="nav-home" onclick="showPage('home')"><div class="nav-icon"><img src="05_home.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>หน้าแรก</button>
-    <button class="nav-item" id="nav-clock" onclick="showPage('clock')"><div class="nav-icon"><img src="01_clock_in.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ลงเวลา</button>
-    <button class="nav-item" id="nav-leave" onclick="showPage('leave')"><div class="nav-icon"><img src="07_leave_request.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ลางาน</button>
-    <button class="nav-item" id="nav-report" onclick="showPage('report')"><div class="nav-icon"><img src="08_report.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>รายงาน</button>
-    <button class="nav-item" id="nav-announce" onclick="showPage('announce')"><div class="nav-icon"><img src="09_announcement.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ประกาศ</button>
-    <button class="nav-item hr-nav" id="nav-admin" onclick="showPage('admin')" style="display:none"><div class="nav-icon"><img src="10_settings.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>Admin</button>
-    <button class="nav-item" id="nav-bonus" onclick="showPage('bonus')"><div class="nav-icon"><img src="11_attendance_bonus.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>เบี้ยขยัน</button>
-    <button class="nav-item" id="nav-profile" onclick="showPage('profile')"><div class="nav-icon"><img src="12_profile.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>โปรไฟล์</button>
+    <button class="nav-item active" id="nav-home" onclick="showPage('home')"><div class="nav-icon"><img src="assets/icons/features/05_home.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>หน้าแรก</button>
+    <button class="nav-item" id="nav-clock" onclick="showPage('clock')"><div class="nav-icon"><img src="assets/icons/features/01_clock_in.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ลงเวลา</button>
+    <button class="nav-item" id="nav-leave" onclick="showPage('leave')"><div class="nav-icon"><img src="assets/icons/features/07_leave_request.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ลางาน</button>
+    <button class="nav-item" id="nav-report" onclick="showPage('report')"><div class="nav-icon"><img src="assets/icons/features/08_report.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>รายงาน</button>
+    <button class="nav-item" id="nav-announce" onclick="showPage('announce')"><div class="nav-icon"><img src="assets/icons/features/09_announcement.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>ประกาศ</button>
+    <button class="nav-item hr-nav" id="nav-admin" onclick="showPage('admin')" style="display:none"><div class="nav-icon"><img src="assets/icons/features/10_settings.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>Admin</button>
+    <button class="nav-item" id="nav-bonus" onclick="showPage('bonus')"><div class="nav-icon"><img src="assets/icons/features/11_attendance_bonus.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>เบี้ยขยัน</button>
+    <button class="nav-item" id="nav-profile" onclick="showPage('profile')"><div class="nav-icon"><img src="assets/icons/features/12_profile.png?v=2" style="width:32px;height:32px;border-radius:7px;object-fit:contain"></div>โปรไฟล์</button>
   </div>
 </div>
 
@@ -752,6 +822,20 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
     </div>
     <label class="modal-label">สาขา *</label><select class="modal-select" id="empf-branch"><option value="">-- เลือกสาขา --</option></select>
     <div style="font-size:11px;color:var(--text3);margin:2px 0 6px;padding:6px 8px;background:#E3F2FD;border-radius:6px">ℹ️ กะการทำงานเลือกตอนเช็คอินแต่ละวัน (ไม่ต้องกำหนดล่วงหน้า)</div>
+    <div style="font-size:11px;font-weight:700;color:var(--teal2);margin:14px 0 6px;letter-spacing:.5px">ตารางวันทำงาน</div>
+    <label class="modal-label" style="margin-top:0">วันหยุดประจำสัปดาห์</label>
+    <div class="weekly-off-grid" id="empf-weekly-off-days">
+      <label class="weekly-off-option"><input type="checkbox" value="1">จันทร์</label>
+      <label class="weekly-off-option"><input type="checkbox" value="2">อังคาร</label>
+      <label class="weekly-off-option"><input type="checkbox" value="3">พุธ</label>
+      <label class="weekly-off-option"><input type="checkbox" value="4">พฤหัสบดี</label>
+      <label class="weekly-off-option"><input type="checkbox" value="5">ศุกร์</label>
+      <label class="weekly-off-option"><input type="checkbox" value="6">เสาร์</label>
+      <label class="weekly-off-option"><input type="checkbox" value="0">อาทิตย์</label>
+    </div>
+    <label class="modal-label" for="empf-schedule-effective">เริ่มใช้ตั้งแต่วันที่ *</label>
+    <input class="modal-input" type="date" id="empf-schedule-effective">
+    <div class="schedule-helper" id="empf-schedule-status">วันที่เลือกเป็นวันหยุด ระบบจะไม่นับว่าเป็นวันขาดงาน สามารถกำหนดต่างกันรายพนักงานได้</div>
     <label class="modal-label">บทบาท *</label>
     <select class="modal-select" id="empf-role" onchange="updateRoleHint()">
       <option value="employee">👤 พนักงาน</option>
@@ -759,6 +843,19 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <option value="owner">👑 เจ้าของกิจการ</option>
     </select>
     <div id="empf-role-hint" style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.5;padding:8px 10px;background:var(--gray);border-radius:8px"></div>
+    <div id="empf-account-section" style="display:none;margin-top:12px;padding:12px;background:var(--gray);border-radius:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--teal2);margin-bottom:6px">บัญชี Email สำหรับเข้าระบบ</div>
+      <div id="empf-account-status" style="font-size:11px;color:var(--text3);margin-bottom:8px"></div>
+      <label class="modal-label" for="empf-email" style="margin-top:0">Email</label>
+      <input class="modal-input" type="email" id="empf-email" autocomplete="email" placeholder="name@example.com">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <button class="btn-primary" id="empf-invite-account" type="button" onclick="inviteEmployeeAccount()" style="margin:0">ส่งคำเชิญ</button>
+        <button class="btn-secondary" id="empf-reset-account" type="button" onclick="sendEmployeePasswordReset()" style="margin:0">ส่งตั้งรหัสใหม่</button>
+        <button class="btn-secondary" id="empf-disable-account" type="button" onclick="disableEmployeeAccount()" style="margin:0;background:#FCE4EC;color:#C62828;border:1px solid #E53935">ปิดบัญชี</button>
+        <button class="btn-secondary" id="empf-enable-account" type="button" onclick="enableEmployeeAccount()" style="display:none;margin:0;background:#E8F8F5;color:#0B7A65;border:1px solid var(--teal)">เปิดบัญชี</button>
+      </div>
+      <div style="font-size:10px;color:var(--text3);line-height:1.5;margin-top:8px">คำสั่งจัดการบัญชีต้องเข้าสู่ระบบด้วย Email ของ HR/Owner</div>
+    </div>
     <div id="empf-device-section" style="display:none;margin-top:10px;padding:10px 12px;background:#F3E5F5;border-radius:8px">
       <div style="font-size:11px;font-weight:700;color:#4A148C;margin-bottom:4px">🔒 อุปกรณ์ที่ลงทะเบียน</div>
       <div id="empf-device-info" style="font-size:12px;color:#6A1B9A"></div>
@@ -837,6 +934,28 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       </select>
     </div>
     <div id="leave-manage-list" style="max-height:55vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- EDIT LEAVE MODAL -->
+<div class="modal-overlay" id="modal-leave-summary">
+  <div class="modal-box leave-summary-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">สรุปวันลาสะสม <button class="modal-close" onclick="closeModal('modal-leave-summary')">✕</button></div>
+    <div class="leave-summary-toolbar">
+      <div style="min-width:135px">
+        <label class="modal-label" for="leave-summary-year">ปี</label>
+        <select class="modal-select" id="leave-summary-year" onchange="loadLeaveSummary()"></select>
+      </div>
+      <div style="flex:1;min-width:180px">
+        <label class="modal-label" for="leave-summary-search">ค้นหาพนักงาน</label>
+        <input class="modal-input" id="leave-summary-search" placeholder="พิมพ์ชื่อพนักงาน..." oninput="renderLeaveSummary()" style="margin-bottom:0">
+      </div>
+      <button class="btn-primary" onclick="exportLeaveSummary()" style="width:auto;min-width:150px;margin:0">📥 Export Excel</button>
+    </div>
+    <div id="leave-summary-cards" class="leave-summary-cards"></div>
+    <div id="leave-summary-content"><div class="loading-text">กำลังโหลด...</div></div>
+    <div style="font-size:10px;color:var(--text3);margin-top:10px;line-height:1.5">นับเฉพาะรายการลาที่อนุมัติแล้วภายในปีที่เลือก · สิทธิ์มาตรฐาน: ลาป่วย 30 วัน ลากิจ 6 วัน ลาพักร้อน 3 วัน</div>
   </div>
 </div>
 
@@ -1001,8 +1120,10 @@ const{createClient}=supabase;
 const db=createClient(SB_URL,SB_KEY);
 
 let user=null,todayAtt=null,selLeaveId=null,selLeaveType='sick';
-let allEmps=[],allShifts=[],allBranches=[],bonusCfg=null;
+let allEmps=[],allShifts=[],allBranches=[],bonusCfg=null,employeeWorkPatterns=[];
 let clockTick=null,gpsCached=null;
+let loginAuthType='pin';
+let pinSessionSecret='';
 const QUOTAS={sick:30,personal:6,vacation:3};
 const LLABELS={sick:'🏥 ลาป่วย',personal:'📋 ลากิจ',vacation:'🌴 ลาพักร้อน',unpaid:'💸 ลาหักเงิน'};
 const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
@@ -1025,6 +1146,30 @@ function fmtT(ts){
 }
 function dateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;} // YYYY-MM-DD เวลาท้องถิ่น (ไม่แปลง UTC)
 function todayStr(){return dateStr(new Date());}
+function employeeInServiceOnDate(employee,date){
+  if(employee.start_date&&date<employee.start_date)return false;
+  if(employee.resigned_at&&date>employee.resigned_at)return false;
+  return true;
+}
+function workPatternForDate(patterns,employeeId,date){
+  return(patterns||[])
+    .filter(p=>p.employee_id===employeeId&&p.effective_from<=date&&(!p.effective_to||p.effective_to>=date))
+    .sort((a,b)=>b.effective_from.localeCompare(a.effective_from))[0]||null;
+}
+function syncWeeklyOffStyles(){
+  document.querySelectorAll('#empf-weekly-off-days .weekly-off-option').forEach(option=>{
+    option.classList.toggle('selected',option.querySelector('input').checked);
+  });
+}
+function setWeeklyOffDays(days=[]){
+  document.querySelectorAll('#empf-weekly-off-days input').forEach(input=>{
+    input.checked=days.includes(Number(input.value));
+  });
+  syncWeeklyOffStyles();
+}
+function selectedWeeklyOffDays(){
+  return[...document.querySelectorAll('#empf-weekly-off-days input:checked')].map(input=>Number(input.value)).sort();
+}
 function monthStr(d){const dt=d||new Date();return dt.getFullYear()+'-'+(dt.getMonth()+1).toString().padStart(2,'0');}
 function thaiM(ym){const[y,m]=ym.split('-');const ms=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return ms[parseInt(m)]+' '+(parseInt(y)+543);}
 // เบี้ยขยันเริ่มใช้ เม.ย. 2569 (เดือนก่อนหน้าไม่ได้รับเบี้ยขยันทุกคน)
@@ -1048,11 +1193,27 @@ function openModal(id){document.getElementById(id).classList.add('show');}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 
 // AUTH
+function setLoginMode(mode){
+  const isAuth=mode==='auth';
+  document.getElementById('login-pin-fields').hidden=isAuth;
+  document.getElementById('login-auth-fields').hidden=!isAuth;
+  document.getElementById('login-mode-pin').classList.toggle('active',!isAuth);
+  document.getElementById('login-mode-auth').classList.toggle('active',isAuth);
+  document.getElementById('login-err').style.display='none';
+  if(isAuth)document.getElementById('login-email').focus();
+}
+function showLoginError(message){
+  const err=document.getElementById('login-err');
+  err.textContent=message;err.style.display='block';
+}
 async function initLogin(){
-  const{data}=await db.from('employees').select('id,name,role,status').order('name');
+  const restored=await LSMGAuth.restore(db,['employee','hr','owner']);
+  if(restored){await completeLogin(restored,'supabase');return;}
+  let data=[];
+  try{({employees:data=[]}=await pinAttendanceRequest('list_employees',{},'', ''));}
+  catch(error){showLoginError(error.message);}
   const sel=document.getElementById('login-emp');
   (data||[]).forEach(e=>{
-    if(e.status==='resigned')return;
     const o=document.createElement('option');
     o.value=e.id;
     const roleLabel=e.role==='owner'?' 👑':e.role==='hr'?' 👩‍💼':'';
@@ -1060,39 +1221,95 @@ async function initLogin(){
     sel.appendChild(o);
   });
 }
-async function doLogin(){
-  const id=document.getElementById('login-emp').value;
-  const pin=document.getElementById('login-pin').value;
-  if(!id||!pin){toast('กรุณาเลือกชื่อและใส่ PIN');return;}
-  const{data}=await db.from('employees').select('*').eq('id',id).eq('pin',pin).single();
-  if(!data){document.getElementById('login-err').style.display='block';return;}
-  if(data.status==='resigned'){
-    document.getElementById('login-err').textContent='⚠️ บัญชีนี้ถูกระงับ (พนักงานลาออก)';
-    document.getElementById('login-err').style.display='block';return;
-  }
+async function completeLogin(data,authType){
   const did=getDeviceId(),dname=getDeviceName();
-  if(data.role==='employee'){
+  if(authType==='supabase'&&data.role==='employee'){
     if(!data.device_id){
-      await db.from('employees').update({device_id:did,device_name:dname}).eq('id',id);
+      await db.from('employees').update({device_id:did,device_name:dname}).eq('id',data.id);
       data.device_id=did;data.device_name=dname;
-    } else if(data.device_id!==did){
-      await db.from('device_alerts').insert({employee_id:id,device_id:did,device_name:dname,alert_type:'device_mismatch'});
-      document.getElementById('login-err').textContent='⚠️ ไม่สามารถเข้าจากอุปกรณ์นี้ได้ กรุณาใช้เครื่องที่ลงทะเบียนไว้';
-      document.getElementById('login-err').style.display='block';return;
+    }else if(data.device_id!==did){
+      await db.from('device_alerts').insert({employee_id:data.id,device_id:did,device_name:dname,alert_type:'device_mismatch'});
+      if(authType==='supabase')await LSMGAuth.signOut(db);
+      showLoginError('ไม่สามารถเข้าจากอุปกรณ์นี้ได้ กรุณาใช้เครื่องที่ลงทะเบียนไว้');
+      return;
     }
   }
-  user=data;
+  user=data;loginAuthType=authType;
   document.getElementById('login-err').style.display='none';
   document.getElementById('screen-login').classList.remove('active');
   document.getElementById('screen-app').classList.add('active');
-  initApp();
+  await initApp();
 }
-function doLogout(){
+async function doLogin(){
+  const id=document.getElementById('login-emp').value;
+  const pin=normalizePinInput(document.getElementById('login-pin').value);
+  if(!id||!pin){toast('กรุณาเลือกชื่อและใส่ PIN');return;}
+  if(!/^\d{4}$/.test(pin)){showLoginError('กรุณากรอก PIN เป็นตัวเลข 4 หลัก');return;}
+  document.getElementById('login-pin').value=pin;
+  try{
+    const result=await pinAttendanceRequest('login',{},id,pin);
+    pinSessionSecret=pin;
+    result.employee._pinBootstrap=result;
+    await completeLogin(result.employee,'pin');
+  }catch(error){showLoginError(error.message);}
+}
+
+function normalizePinInput(value){
+  return String(value||'').trim()
+    .replace(/[๐-๙]/g,digit=>String('๐๑๒๓๔๕๖๗๘๙'.indexOf(digit)))
+    .replace(/[０-９]/g,digit=>String(digit.charCodeAt(0)-0xFF10))
+    .replace(/\s+/g,'');
+}
+
+async function pinAttendanceRequest(action,payload={},employeeId=user?.id,pin=pinSessionSecret){
+  let response;
+  try{
+    response=await fetch(`${SB_URL}/functions/v1/pin-attendance`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({action,employee_id:employeeId||undefined,pin:normalizePinInput(pin)||undefined,device_id:getDeviceId(),device_name:getDeviceName(),...payload})
+    });
+  }catch(error){
+    throw new Error('เชื่อมต่อระบบลงเวลาไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ต แล้วลองใหม่อีกครั้ง');
+  }
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(result.error||'ไม่สามารถเชื่อมต่อระบบลงเวลาได้');
+  return result;
+}
+async function doAuthLogin(){
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  const password=document.getElementById('login-password').value;
+  const button=document.getElementById('auth-login-button');
+  if(!email||!password){showLoginError('กรุณากรอกอีเมลและรหัสผ่าน');return;}
+  button.disabled=true;button.textContent='กำลังเข้าสู่ระบบ...';
+  try{
+    const employee=await LSMGAuth.signIn(db,email,password,['employee','hr','owner']);
+    document.getElementById('login-password').value='';
+    await completeLogin(employee,'supabase');
+  }catch(error){showLoginError(error.message);}
+  finally{button.disabled=false;button.textContent='เข้าสู่ระบบด้วย Email';}
+}
+async function requestAuthPasswordReset(){
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  const button=document.getElementById('auth-reset-button');
+  if(!email){showLoginError('กรุณากรอกอีเมลก่อน แล้วกดตั้งรหัสใหม่');return;}
+  button.disabled=true;button.textContent='กำลังส่งลิงก์...';
+  try{
+    await LSMGAuth.requestPasswordReset(db,email,`${location.origin}/index.html`);
+    showLoginError('ส่งลิงก์ตั้งรหัสผ่านแล้ว กรุณาตรวจสอบอีเมลและกล่อง Spam');
+  }catch(error){showLoginError(error.message);}
+  finally{button.disabled=false;button.textContent='ลืมรหัสผ่าน / ตั้งรหัสใหม่';}
+}
+async function doLogout(){
+  if(loginAuthType==='supabase')await LSMGAuth.signOut(db);
   user=null;todayAtt=null;gpsCached=null;
+  pinSessionSecret='';
   if(clockTick)clearInterval(clockTick);
   document.getElementById('screen-app').classList.remove('active');
   document.getElementById('screen-login').classList.add('active');
   document.getElementById('login-pin').value='';
+  document.getElementById('login-password').value='';
+  loginAuthType='pin';setLoginMode('pin');
 }
 
 // INIT
@@ -1108,6 +1325,8 @@ async function initApp(){
   }
   document.getElementById('hdr-name').textContent=user.name;
   document.getElementById('hdr-sub').textContent=(user.department||'')+(user.role==='hr'?' · HR/Admin':'');
+  if(loginAuthType==='pin'){await initPinAttendanceApp();return;}
+  document.querySelectorAll('.nav-item').forEach(el=>el.style.display='');
   if(user.role==='hr'){document.querySelectorAll('.hr-nav').forEach(el=>el.style.display='flex');}
   const{data:cfg}=await db.from('bonus_config').select('*').single();bonusCfg=cfg;
   const{data:sh}=await db.from('shifts').select('*').order('shift_name');allShifts=sh||[];
@@ -1120,9 +1339,24 @@ async function initApp(){
   document.getElementById('leave-to').value=todayStr();
   loadTodayAtt();loadHome();loadLeave();loadBonus();
   if(user.role==='hr'||user.role==='owner'){loadAdminSummary();loadApproveCount();loadAlertCount();}
-  if(user.role==='owner')cleanupResigned();
   checkGPS();
   applyRoleAccess();
+}
+
+async function initPinAttendanceApp(){
+  const bootstrap=user._pinBootstrap||await pinAttendanceRequest('today');
+  allShifts=bootstrap.shifts||[];
+  allBranches=bootstrap.branches||[];
+  todayAtt=bootstrap.attendance||null;
+  document.querySelectorAll('.nav-item').forEach(el=>el.style.display='none');
+  document.getElementById('nav-clock').style.display='flex';
+  document.getElementById('nav-leave').style.display='flex';
+  document.getElementById('btn-open-leave').style.display='none';
+  document.getElementById('pin-leave-readonly').style.display='block';
+  clockTick=setInterval(tickClock,1000);tickClock();
+  updateHomeStatus();updateClockBtns();renderClockLog();
+  showPage('clock');
+  checkGPS();
 }
 
 function applyRoleAccess() {
@@ -1196,6 +1430,11 @@ async function checkGPS(){
 
 // ATTENDANCE
 async function loadTodayAtt(){
+  if(loginAuthType==='pin'){
+    try{const result=await pinAttendanceRequest('today');todayAtt=result.attendance||null;}
+    catch(error){toast(error.message,'#E53935');}
+    updateHomeStatus();updateClockBtns();renderClockLog();return;
+  }
   const{data}=await db.from('attendance').select('*').eq('employee_id',user.id).eq('work_date',todayStr()).maybeSingle();
   todayAtt=data;updateHomeStatus();updateClockBtns();renderClockLog();
 }
@@ -1256,7 +1495,7 @@ async function doCheckin(){
   if(!navigator.geolocation){await saveCheckin(null,null,null,note);return;}
   navigator.geolocation.getCurrentPosition(async pos=>{
     const lat=pos.coords.latitude,lng=pos.coords.longitude;
-    const{data:brs}=await db.from('branches').select('*').eq('active',true);
+    const brs=allBranches;
     let nearest=null,minD=Infinity;
     (brs||[]).forEach(b=>{const d=calcDist(lat,lng,b.latitude,b.longitude);if(d<minD){minD=d;nearest=b;}});
     if(!nearest||minD>(nearest.radius_meters||50)){
@@ -1277,6 +1516,16 @@ async function saveCheckin(lat,lng,branchId,note){
     const now=new Date();
     const diffMins=(now.getHours()*60+now.getMinutes())-(sh*60+sm);
     isLate = diffMins > 5;
+  }
+  if(loginAuthType==='pin'){
+    try{
+      const result=await pinAttendanceRequest('check_in',{latitude:lat,longitude:lng,shift_id:shiftId,note});
+      todayAtt=result.attendance;updateHomeStatus();updateClockBtns();renderClockLog();
+      const shiftLabel=todayShift?` (กะ ${todayShift.check_in_time.substring(0,5)})`:'';
+      const lateMsg=isLate?' ⚠️ มาสาย':' ✅ ตรงเวลา';
+      toast('✅ เช็คอิน'+(result.branch?' '+result.branch:'')+shiftLabel+lateMsg,'#0B9E82');
+    }catch(error){toast(error.message,'#E53935');document.getElementById('btn-cin').disabled=false;}
+    return;
   }
   const{data,error}=await db.from('attendance').insert({
     employee_id:user.id,
@@ -1303,7 +1552,7 @@ async function doCheckout(){
   if(!navigator.geolocation){await saveCheckout(null,null);return;}
   navigator.geolocation.getCurrentPosition(async pos=>{
     const lat=pos.coords.latitude,lng=pos.coords.longitude;
-    const{data:brs}=await db.from('branches').select('*').eq('active',true);
+    const brs=allBranches;
     let nearest=null,minD=Infinity;
     (brs||[]).forEach(b=>{const d=calcDist(lat,lng,b.latitude,b.longitude);if(d<minD){minD=d;nearest=b;}});
     if(!nearest||minD>(nearest.radius_meters||200)){
@@ -1314,6 +1563,16 @@ async function doCheckout(){
   },async()=>await saveCheckout(null,null),{enableHighAccuracy:true,timeout:10000});
 }
 async function saveCheckout(lat,lng){
+  if(loginAuthType==='pin'){
+    try{
+      const result=await pinAttendanceRequest('check_out',{latitude:lat,longitude:lng});
+      todayAtt=result.attendance;updateHomeStatus();updateClockBtns();renderClockLog();
+      const otMins=todayAtt.ot_minutes||0;
+      const otMsg=otMins>=11?` | OT ${Math.floor(otMins/60)}ชม. ${otMins%60}น.`:'';
+      toast('🚪 เช็คเอาท์สำเร็จ '+fmtT(todayAtt.check_out)+otMsg,'#1565C0');
+    }catch(error){toast(error.message,'#E53935');document.getElementById('btn-cout').disabled=false;}
+    return;
+  }
   let otMins=0;
   const now=new Date();
   const shift=user._todayShift || allShifts.find(x=>x.id===user.shift_id);
@@ -1352,7 +1611,18 @@ async function loadHome(){
 
 // LEAVE
 async function loadLeave(){
-  const{data}=await db.from('leave_requests').select('*').eq('employee_id',user.id).order('created_at',{ascending:false});
+  let data=[];
+  if(loginAuthType==='pin'){
+    try{({leaves:data=[]}=await pinAttendanceRequest('leave_summary'));}
+    catch(error){
+      document.getElementById('leave-history').innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">โหลดข้อมูลวันลาไม่สำเร็จ</div></div>';
+      toast(error.message,'#E53935');return;
+    }
+  }else{
+    const result=await db.from('leave_requests').select('*').eq('employee_id',user.id).order('created_at',{ascending:false});
+    if(result.error){toast('โหลดข้อมูลวันลาไม่สำเร็จ: '+result.error.message,'#E53935');return;}
+    data=result.data||[];
+  }
   const thisYear=new Date().getFullYear();
   const used={sick:0,personal:0,vacation:0};
   data?.filter(l=>l.status==='approved').forEach(l=>{
@@ -1592,26 +1862,52 @@ async function loadReport(){
     return;
   }
   const date=document.getElementById('r-date').value||todayStr();
-  const{data:emps}=await db.from('employees').select('*').order('name');
-  const{data:atts}=await db.from('attendance').select('*').eq('work_date',date);
-  const{data:leaves}=await db.from('leave_requests').select('*').eq('status','approved').lte('start_date',date).gte('end_date',date);
-  let present=0,late=0,onleave=0;
+  const[
+    {data:employeeRows},
+    {data:atts},
+    {data:leaves},
+    {data:workPatterns,error:workPatternError}
+  ]=await Promise.all([
+    db.from('employees').select('*').order('name'),
+    db.from('attendance').select('*').eq('work_date',date),
+    db.from('leave_requests').select('*').eq('status','approved').lte('start_date',date).gte('end_date',date),
+    db.from('employee_work_patterns').select('*').lte('effective_from',date)
+  ]);
+  const emps=(employeeRows||[]).filter(employee=>employeeInServiceOnDate(employee,date)
+    &&(employee.payroll_eligible!==false||employee.attendance_required!==false));
+  if(workPatternError){
+    document.getElementById('report-content').innerHTML='<div class="loading-text" style="color:var(--red)">โหลดตารางวันหยุดไม่ได้</div>';
+    return;
+  }
+  let present=0,late=0,onleave=0,absent=0,weeklyOff=0,unscheduled=0;
   const el=document.getElementById('report-content');
-  if(!emps){el.innerHTML='<div class="loading-text">ไม่พบข้อมูล</div>';return;}
+  if(!emps.length){el.innerHTML='<div class="loading-text">ไม่พบข้อมูล</div>';return;}
   const rows=emps.map((e,i)=>{
     const a=atts?.find(x=>x.employee_id===e.id);
     const l=leaves?.find(x=>x.employee_id===e.id);
+    const pattern=workPatternForDate(workPatterns,e.id,date);
+    const isWeeklyOff=pattern&&pattern.weekly_off_days.includes(new Date(date+'T00:00:00').getDay());
     const shift=allShifts.find(x=>x.id===e.shift_id);
     const br=allBranches.find(x=>x.id===a?.branch_id);
     let badge='ยังไม่มา',badgeCls='badge-absent',sub='--';
-    if(l){onleave++;badge=LLABELS[l.leave_type]||'ลา';badgeCls='badge-leave';sub='ลางาน';}
-    else if(a?.check_in){
+    if(a?.check_in){
       present++;
       // คำนวณสายจากกะที่บันทึกในระเบียนวันนั้น (รองรับการเลือกกะรายวัน)
-      const lm=attLateMin(a,e.shift_id);
+      const lm=e.attendance_required===false?0:attLateMin(a,e.shift_id);
       if(lm>5){late++;badge='สาย '+lm+'น.';badgeCls='badge-late';}
       else{badge='ตรงเวลา';badgeCls='badge-ok';}
-      sub=(br?br.name:'')+(a.check_in?' เข้า '+fmtT(a.check_in):'')+(a.check_out?' ออก '+fmtT(a.check_out):'');
+      sub=(br?br.name:'')+(a.check_in?' เข้า '+fmtT(a.check_in):'')+(a.break_start?' · ออกพัก '+fmtT(a.break_start):'')+(a.break_end?' · กลับ '+fmtT(a.break_end):'')+(a.check_out?' · ออก '+fmtT(a.check_out):'');
+      if(isWeeklyOff)sub+=' · ทำงานในวันหยุด';
+    }else if(e.attendance_required===false){
+      badge='ยกเว้นลงเวลา';badgeCls='badge-leave';sub='ไม่บังคับตารางและไม่ถูกนับขาดงาน';
+    }else if(isWeeklyOff){
+      weeklyOff++;badge='วันหยุด';badgeCls='badge-leave';sub='วันหยุดประจำสัปดาห์';
+    }else if(l){
+      onleave++;badge=LLABELS[l.leave_type]||'ลา';badgeCls='badge-leave';sub='ลางาน';
+    }else if(!pattern){
+      unscheduled++;badge='รอตั้งตาราง';badgeCls='badge-leave';sub='ยังไม่กำหนดวันหยุดประจำสัปดาห์';
+    }else{
+      absent++;
     }
     const[bg,tx]=AV[i%5];
     const isOwner = user.role==='owner';
@@ -1632,7 +1928,8 @@ async function loadReport(){
     <div class="sum-card"><div class="sum-num" style="color:var(--teal)">${present}</div><div class="sum-lbl">มาทำงาน</div></div>
     <div class="sum-card"><div class="sum-num" style="color:var(--orange)">${late}</div><div class="sum-lbl">สาย</div></div>
     <div class="sum-card"><div class="sum-num" style="color:var(--blue)">${onleave}</div><div class="sum-lbl">ลางาน</div></div>
-    <div class="sum-card"><div class="sum-num" style="color:var(--red)">${emps.length-present-onleave}</div><div class="sum-lbl">ขาด</div></div>
+    <div class="sum-card"><div class="sum-num" style="color:var(--red)">${absent}</div><div class="sum-lbl">ขาด</div></div>
+    ${weeklyOff||unscheduled?`<div class="sum-card"><div class="sum-num" style="color:var(--blue)">${weeklyOff}</div><div class="sum-lbl">วันหยุด${unscheduled?` · รอตาราง ${unscheduled}`:''}</div></div>`:''}
   </div>`+rows.join('');
 }
 
@@ -1701,7 +1998,7 @@ async function loadMyAttHistory() {
       <div class="emp-av" style="background:#E8F8F5;color:#0B9E82;font-size:11px">${a.work_date?.substring(5)}</div>
       <div class="emp-ri">
         <div class="emp-rname">${fmtDate(a.work_date)}</div>
-        <div class="emp-rsub">${a.check_in?'เข้า '+fmtT(a.check_in):'-'}${a.check_out?' ออก '+fmtT(a.check_out):''} · ${hrs}${lateText}</div>
+        <div class="emp-rsub">${a.check_in?'เข้า '+fmtT(a.check_in):'-'}${a.break_start?' · ออกพัก '+fmtT(a.break_start):''}${a.break_end?' · กลับ '+fmtT(a.break_end):''}${a.check_out?' · ออก '+fmtT(a.check_out):''} · ${hrs}${lateText}</div>
         <div class="emp-rsub">${br?'📍 '+br.name:''}</div>
       </div>
       <span class="emp-rbadge ${a.check_out?'badge-ok':'badge-leave'}">${a.check_out?'ครบ':'ค้างอยู่'}</span>
@@ -1717,10 +2014,11 @@ async function loadMonthly(){
   const{data:atts}=await db.from('attendance').select('*').gte('work_date',start).lte('work_date',end);
   const{data:leaves}=await db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end);
   const el=document.getElementById('report-content');
-  const rows=(emps||[]).map((e,i)=>{
+  const monthlyEmps=(emps||[]).filter(e=>e.payroll_eligible!==false||e.attendance_required!==false);
+  const rows=monthlyEmps.map((e,i)=>{
     const ea=atts?.filter(a=>a.employee_id===e.id)||[];
     const el2=leaves?.filter(l=>l.employee_id===e.id)||[];
-    let lateDays=ea.filter(a=>attIsLate(a,e.shift_id)).length;
+    let lateDays=e.attendance_required===false?0:ea.filter(a=>attIsLate(a,e.shift_id)).length;
     const leaveDays=el2.reduce((s,l)=>s+l.days,0);
     const ot=ea.reduce((s,a)=>s+(a.ot_minutes||0)/60,0);
     // สาย 3 ครั้ง = ขาด 1 วัน
@@ -1731,7 +2029,7 @@ async function loadMonthly(){
       <div class="emp-av" style="background:${bg};color:${tx}">${e.name.substring(0,2)}</div>
       <div class="emp-ri"><div class="emp-rname">${e.name}</div>
       <div class="emp-rsub">มา ${ea.length} วัน · สาย ${lateDays} ครั้ง${lateAbsent>0?' (='+lateAbsent+' วันขาด)':''} · ลา ${leaveDays}${ot>0?' · OT '+ot.toFixed(1)+'ชม.':''}</div></div>
-      <span class="emp-rbadge ${qualified?'badge-ok':'badge-absent'}">${qualified?'✅ ได้เบี้ย':'❌'}</span>
+      <span class="emp-rbadge ${e.attendance_required===false?'badge-leave':qualified?'badge-ok':'badge-absent'}">${e.attendance_required===false?'ยกเว้นลงเวลา':qualified?'✅ ได้เบี้ย':'❌'}</span>
     </div>`;
   });
   document.getElementById('report-content').innerHTML=rows.join('');
@@ -1742,7 +2040,8 @@ async function loadBonusReport(){
   let{data:records}=await db.from('attendance_bonus').select('*').eq('year_month',ym);
   if(ym<BONUS_START_YM)records=[];
   let total=0,qualified=0;
-  const rows=(emps||[]).map((e,i)=>{
+  const bonusEmps=(emps||[]).filter(e=>e.attendance_required!==false&&e.payroll_eligible!==false);
+  const rows=bonusEmps.map((e,i)=>{
     const r=records?.find(x=>x.employee_id===e.id);
     const amt=r?.is_qualified?(r.bonus_amount||500):0;
     total+=amt;if(amt>0)qualified++;
@@ -1755,7 +2054,7 @@ async function loadBonusReport(){
   });
   document.getElementById('report-content').innerHTML=`<div class="summary-row" style="grid-template-columns:1fr 1fr 1fr">
     <div class="sum-card"><div class="sum-num" style="color:var(--teal)">${qualified}</div><div class="sum-lbl">ได้เบี้ย</div></div>
-    <div class="sum-card"><div class="sum-num" style="color:var(--red)">${(emps?.length||0)-qualified}</div><div class="sum-lbl">ไม่ได้</div></div>
+    <div class="sum-card"><div class="sum-num" style="color:var(--red)">${bonusEmps.length-qualified}</div><div class="sum-lbl">ไม่ได้</div></div>
     <div class="sum-card"><div class="sum-num" style="color:var(--blue);font-size:16px">฿${total.toLocaleString()}</div><div class="sum-lbl">รวมจ่าย</div></div>
   </div>`+rows.join('');
 }
@@ -1765,13 +2064,15 @@ async function loadAdminSummary(){
   const{data:emps}=await db.from('employees').select('*');
   const{data:atts}=await db.from('attendance').select('*').eq('work_date',todayStr());
   const el=document.getElementById('admin-today-summary');
-  const present=atts?.length||0;
+  const requiredEmps=(emps||[]).filter(e=>e.attendance_required!==false&&e.payroll_eligible!==false&&employeeInServiceOnDate(e,todayStr()));
+  const requiredIds=new Set(requiredEmps.map(e=>e.id));
+  const present=(atts||[]).filter(a=>requiredIds.has(a.employee_id)&&a.check_in).length;
   el.innerHTML=`<div class="card-title">📊 สถานะวันนี้</div>
   <div class="summary-row">
-    <div class="sum-card"><div class="sum-num" style="color:var(--teal)">${emps?.length||0}</div><div class="sum-lbl">พนักงาน</div></div>
+    <div class="sum-card"><div class="sum-num" style="color:var(--teal)">${requiredEmps.length}</div><div class="sum-lbl">พนักงานที่ต้องลงเวลา</div></div>
     <div class="sum-card"><div class="sum-num" style="color:var(--green)">${present}</div><div class="sum-lbl">เข้างาน</div></div>
-    <div class="sum-card"><div class="sum-num" style="color:var(--red)">${(emps?.length||0)-present}</div><div class="sum-lbl">ยังไม่มา</div></div>
-    <div class="sum-card"><div class="sum-num" style="color:var(--blue)">${present>0?Math.round(present/(emps?.length||1)*100):0}%</div><div class="sum-lbl">อัตรา</div></div>
+    <div class="sum-card"><div class="sum-num" style="color:var(--red)">${requiredEmps.length-present}</div><div class="sum-lbl">ยังไม่มา</div></div>
+    <div class="sum-card"><div class="sum-num" style="color:var(--blue)">${present>0?Math.round(present/(requiredEmps.length||1)*100):0}%</div><div class="sum-lbl">อัตรา</div></div>
   </div>`;
 }
 async function loadApproveCount(){
@@ -1849,6 +2150,56 @@ async function decideLeave(status){
 }
 
 // EMP MANAGEMENT
+document.querySelectorAll('#empf-weekly-off-days input').forEach(input=>input.addEventListener('change',syncWeeklyOffStyles));
+
+async function loadEmployeeWorkPattern(employeeId){
+  setWeeklyOffDays([]);
+  const effectiveInput=document.getElementById('empf-schedule-effective');
+  const status=document.getElementById('empf-schedule-status');
+  effectiveInput.value=todayStr();
+  status.textContent='กำลังโหลดตารางวันหยุด...';
+  const{data,error}=await db.from('employee_work_patterns').select('*').eq('employee_id',employeeId).order('effective_from',{ascending:false});
+  if(error){
+    status.textContent='โหลดตารางไม่ได้: '+error.message;
+    throw error;
+  }
+  const patterns=data||[];
+  employeeWorkPatterns=employeeWorkPatterns.filter(p=>p.employee_id!==employeeId).concat(patterns);
+  const latest=patterns[0];
+  if(!latest){
+    const employee=allEmps.find(e=>e.id===employeeId);
+    effectiveInput.value=employee?.start_date||todayStr();
+    status.textContent='ยังไม่กำหนดตาราง กรุณาเลือกวันหยุดและวันที่เริ่มใช้ เพื่อป้องกันการนับขาดงานผิด';
+    return;
+  }
+  effectiveInput.value=latest.effective_from;
+  setWeeklyOffDays(latest.weekly_off_days||[]);
+  const dayNames=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const offText=(latest.weekly_off_days||[]).length
+    ?latest.weekly_off_days.map(day=>dayNames[day]).join(', ')
+    :'ไม่มีวันหยุดประจำสัปดาห์';
+  status.textContent=`ตารางล่าสุด: ${offText} · เริ่มใช้ ${fmtDate(latest.effective_from)}`;
+}
+
+async function saveEmployeeWorkPattern(employeeId){
+  const effectiveFrom=document.getElementById('empf-schedule-effective').value;
+  if(!effectiveFrom)throw new Error('กรุณาระบุวันที่เริ่มใช้ตารางวันหยุด');
+  const weeklyOffDays=selectedWeeklyOffDays();
+  const existing=employeeWorkPatterns.find(p=>p.employee_id===employeeId&&p.effective_from===effectiveFrom);
+  let error;
+  if(existing){
+    ({error}=await db.from('employee_work_patterns').update({weekly_off_days:weeklyOffDays,updated_at:new Date().toISOString()}).eq('id',existing.id));
+  }else{
+    ({error}=await db.from('employee_work_patterns').insert({
+      employee_id:employeeId,
+      weekly_off_days:weeklyOffDays,
+      effective_from:effectiveFrom,
+      created_by:user?.id||null
+    }));
+  }
+  if(error)throw error;
+}
+
 async function loadEmpList(){
   const{data}=await db.from('employees').select('*').order('name');
   allEmps=data||[];
@@ -1865,7 +2216,7 @@ async function loadEmpList(){
     </div>`;
   }).join('');
 }
-function openEmpForm(id){
+async function openEmpForm(id){
   const sel2=document.getElementById('empf-branch');
   sel2.innerHTML='<option value="">-- เลือกสาขา --</option>';
   allBranches.forEach(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=b.name;sel2.appendChild(o);});
@@ -1885,6 +2236,8 @@ function openEmpForm(id){
     document.getElementById('empf-pin').value=e.pin||'';
     document.getElementById('empf-branch').value=e.branch_id||'';
     document.getElementById('empf-role').value=e.role||'employee';
+    document.getElementById('empf-email').value=e.email||'';
+    renderEmployeeAccountControls(e);
     document.getElementById('empf-delete').style.display='block';
     // แสดงรูปถ้ามี
     const prev=document.getElementById('empf-photo-preview');
@@ -1919,6 +2272,8 @@ function openEmpForm(id){
     document.getElementById('empf-dept').value='';
     document.getElementById('empf-branch').value='';
     document.getElementById('empf-role').value='employee';document.getElementById('empf-delete').style.display='none';
+    document.getElementById('empf-email').value='';
+    document.getElementById('empf-account-section').style.display='none';
     // reset รูป
     document.getElementById('empf-photo-input').value='';
     document.getElementById('empf-photo-preview').style.display='none';
@@ -1932,6 +2287,13 @@ function openEmpForm(id){
   updateRoleHint();
   openModal('modal-emp-form');
   checkDeleteEmpBtn();
+  if(id){
+    try{await loadEmployeeWorkPattern(id);}catch(error){toast('โหลดตารางวันหยุดไม่ได้: '+error.message,'#E53935');}
+  }else{
+    setWeeklyOffDays([]);
+    document.getElementById('empf-schedule-effective').value=document.getElementById('empf-startdate').value||todayStr();
+    document.getElementById('empf-schedule-status').textContent='เลือกวันหยุดประจำสัปดาห์ของพนักงาน และระบุวันที่เริ่มใช้';
+  }
 }
 function updateRoleHint(){
   const r=document.getElementById('empf-role').value;
@@ -1951,6 +2313,90 @@ function checkDeleteEmpBtn() {
       delBtn.style.display = 'none';
     }
   }
+}
+
+function renderEmployeeAccountControls(employee){
+  const section=document.getElementById('empf-account-section');
+  const status=document.getElementById('empf-account-status');
+  const invite=document.getElementById('empf-invite-account');
+  const reset=document.getElementById('empf-reset-account');
+  const disable=document.getElementById('empf-disable-account');
+  const enable=document.getElementById('empf-enable-account');
+  section.style.display='block';
+  const linked=Boolean(employee.auth_user_id);
+  const disabled=employee.status==='disabled'||employee.status==='resigned'||Boolean(employee.access_disabled_at);
+  if(linked){
+    status.textContent=disabled?'บัญชีถูกปิดสิทธิ์':'เชื่อมบัญชีแล้ว · ใช้งานได้';
+  }else if(employee.account_request_status==='pending'){
+    status.textContent='รอ HR/Owner ตรวจสอบและส่งคำเชิญ';
+  }else{
+    status.textContent='ยังไม่ได้เชื่อมบัญชี Email';
+  }
+  invite.style.display=linked?'none':'block';
+  reset.style.display=linked&&!disabled?'block':'none';
+  disable.style.display=linked&&!disabled?'block':'none';
+  enable.style.display=linked&&disabled?'block':'none';
+}
+
+async function invokeAdminUserAction(action,extra={}){
+  if(loginAuthType!=='supabase')throw new Error('กรุณาออกจากระบบ แล้วเข้าสู่ระบบด้วย Email ของ HR/Owner ก่อน');
+  const employeeId=document.getElementById('empf-id').value;
+  const{data,error}=await db.functions.invoke('admin-user-management',{
+    body:{action,employee_id:employeeId,...extra}
+  });
+  if(error){
+    let message=data?.error||error.message||'ดำเนินการไม่สำเร็จ';
+    try{const payload=await error.context?.json();message=payload?.error||message;}catch{}
+    throw new Error(message);
+  }
+  if(data?.error)throw new Error(data.error);
+  return data;
+}
+
+async function inviteEmployeeAccount(){
+  const employee=allEmps.find(e=>e.id===document.getElementById('empf-id').value);if(!employee)return;
+  const email=document.getElementById('empf-email').value.trim().toLowerCase();
+  if(!email||!email.includes('@')){toast('กรุณากรอก Email ให้ถูกต้อง','#E53935');return;}
+  const button=document.getElementById('empf-invite-account');
+  button.disabled=true;button.textContent='กำลังส่ง...';
+  try{
+    await invokeAdminUserAction('invite_user',{email,redirect_to:`${location.origin}/index.html`});
+    toast('ส่งคำเชิญตั้งรหัสผ่านไปยัง Email แล้ว','#0B9E82');
+    closeModal('modal-emp-form');await loadEmpList();
+  }catch(error){toast(error.message,'#E53935');}
+  finally{button.disabled=false;button.textContent='ส่งคำเชิญ';}
+}
+
+async function sendEmployeePasswordReset(){
+  const email=document.getElementById('empf-email').value.trim().toLowerCase();
+  if(!email){toast('ไม่พบ Email ของพนักงาน','#E53935');return;}
+  const button=document.getElementById('empf-reset-account');
+  button.disabled=true;button.textContent='กำลังส่ง...';
+  try{
+    await LSMGAuth.requestPasswordReset(db,email,`${location.origin}/index.html`);
+    toast('ส่งลิงก์ตั้งรหัสผ่านใหม่แล้ว','#0B9E82');
+  }catch(error){toast(error.message,'#E53935');}
+  finally{button.disabled=false;button.textContent='ส่งตั้งรหัสใหม่';}
+}
+
+async function disableEmployeeAccount(){
+  const employee=allEmps.find(e=>e.id===document.getElementById('empf-id').value);if(!employee)return;
+  if(!confirm(`ปิดบัญชี Email ของ "${employee.name}"?\n\nพนักงานจะเข้าดูข้อมูลส่วนตัวจากบัญชีนี้ไม่ได้`))return;
+  try{
+    await invokeAdminUserAction('disable_user',{reason:'disabled by HR/Owner'});
+    toast('ปิดบัญชีเรียบร้อยแล้ว','#E53935');
+    closeModal('modal-emp-form');await loadEmpList();
+  }catch(error){toast(error.message,'#E53935');}
+}
+
+async function enableEmployeeAccount(){
+  const employee=allEmps.find(e=>e.id===document.getElementById('empf-id').value);if(!employee)return;
+  if(!confirm(`เปิดบัญชี Email ของ "${employee.name}" อีกครั้ง?`))return;
+  try{
+    await invokeAdminUserAction('enable_user');
+    toast('เปิดบัญชีเรียบร้อยแล้ว','#0B9E82');
+    closeModal('modal-emp-form');await loadEmpList();
+  }catch(error){toast(error.message,'#E53935');}
 }
 
 async function saveEmp(){
@@ -1976,6 +2422,12 @@ async function saveEmp(){
     error=insErr; if(newEmp) savedId=newEmp.id;
   }
   if(error){toast('Error: '+(error.message.includes('unique')?'Email นี้มีอยู่แล้ว':error.message),'#E53935');return;}
+  try{
+    await saveEmployeeWorkPattern(savedId);
+  }catch(scheduleError){
+    toast('บันทึกข้อมูลพนักงานแล้ว แต่ตารางวันหยุดบันทึกไม่ได้: '+scheduleError.message,'#E53935');
+    return;
+  }
   if(savedId && document.getElementById('empf-photo-input').files[0]){
     toast('⏳ กำลังอัปโหลดรูป...','#534AB7');
     await saveEmpPhoto(savedId);
@@ -1985,6 +2437,18 @@ async function saveEmp(){
 }
 async function deleteEmp(){
   const id=document.getElementById('empf-id').value,name=document.getElementById('empf-name').value;
+  const employee=allEmps.find(e=>e.id===id);if(!employee)return;
+  if(employee.auth_user_id){toast('พนักงานที่มีบัญชีแล้วต้องใช้ “บันทึกลาออก” เพื่อเก็บประวัติ','#E53935');return;}
+  const historyTables=['attendance','leave_requests','attendance_bonus','employee_salary','payroll_items','salary_advances'];
+  const historyCounts=await Promise.all(historyTables.map(table=>db.from(table).select('id',{count:'exact',head:true}).eq('employee_id',id)));
+  if(historyCounts.some(result=>(result.count||0)>0)){
+    toast('พนักงานมีประวัติการทำงานแล้ว กรุณาใช้ “บันทึกลาออก” แทนการลบ','#E53935');return;
+  }
+  if(!confirm('ลบ "'+name+'" ซึ่งยังไม่มีประวัติออกจากระบบ?'))return;
+  const{error:safeDeleteError}=await db.from('employees').delete().eq('id',id);
+  if(safeDeleteError){toast('ลบไม่ได้: '+safeDeleteError.message,'#E53935');return;}
+  closeModal('modal-emp-form');toast('ลบข้อมูลพนักงานที่สร้างผิดเรียบร้อยแล้ว','#E53935');loadEmpList();
+  return;
   if(!confirm('ลบ "'+name+'" ออกจากระบบ?\n\nข้อมูลทั้งหมดจะถูกลบออก (ประวัติเวลา, การลา, เบี้ยขยัน)'))return;
   toast('⏳ กำลังลบข้อมูล...','#E53935');
   await db.from('attendance').delete().eq('employee_id',id);
@@ -2001,6 +2465,17 @@ async function deleteEmp(){
 async function resignEmp(){
   const id=document.getElementById('empf-id').value;
   const emp=allEmps.find(e=>e.id===id);if(!emp)return;
+  if(!confirm(`บันทึก "${emp.name}" ลาออก?\n\nระบบจะปิดสิทธิ์ทันที และเก็บประวัติเวลา การลา เงินเดือน และสลิปไว้`))return;
+  try{
+    if(emp.auth_user_id){await invokeAdminUserAction('resign_user',{reason:'employee resigned'});}
+    else{
+      const{error:legacyResignError}=await db.from('employees').update({status:'resigned',resigned_at:todayStr(),access_disabled_at:new Date().toISOString(),access_disabled_reason:'employee resigned'}).eq('id',id);
+      if(legacyResignError)throw legacyResignError;
+    }
+  }catch(error){toast(error.message,'#E53935');return;}
+  emp.status='resigned';emp.resigned_at=todayStr();emp.access_disabled_at=new Date().toISOString();
+  closeModal('modal-emp-form');toast('บันทึกลาออกและปิดสิทธิ์แล้ว · ประวัติยังคงอยู่','#E53935');loadEmpList();
+  return;
   if(!confirm(`บันทึก "${emp.name}" ลาออก?\n\nพนักงานจะเข้าระบบไม่ได้ทันที\nข้อมูลจะถูกเก็บไว้ 30 วันแล้วลบอัตโนมัติ`))return;
   const{error}=await db.from('employees').update({status:'resigned',resigned_at:todayStr()}).eq('id',id);
   if(error){toast('Error: '+error.message,'#E53935');return;}
@@ -2014,6 +2489,17 @@ async function restoreEmp(){
   const id=document.getElementById('empf-id').value;
   const emp=allEmps.find(e=>e.id===id);if(!emp)return;
   if(!confirm(`คืนสถานะ "${emp.name}" เป็นพนักงานปกติ?`))return;
+  try{
+    if(emp.auth_user_id){await invokeAdminUserAction('enable_user');}
+    else{
+      const{error:legacyRestoreError}=await db.from('employees').update({status:'active',resigned_at:null,access_disabled_at:null,access_disabled_reason:null}).eq('id',id);
+      if(legacyRestoreError)throw legacyRestoreError;
+    }
+  }catch(error){toast(error.message,'#E53935');return;}
+  emp.status='active';emp.resigned_at=null;emp.access_disabled_at=null;
+  closeModal('modal-emp-form');toast('คืนสถานะพนักงานและเปิดสิทธิ์แล้ว','#0B9E82');loadEmpList();
+  return;
+  if(!confirm(`คืนสถานะ "${emp.name}" เป็นพนักงานปกติ?`))return;
   const{error}=await db.from('employees').update({status:'active',resigned_at:null}).eq('id',id);
   if(error){toast('Error: '+error.message,'#E53935');return;}
   emp.status='active';emp.resigned_at=null;
@@ -2023,6 +2509,8 @@ async function restoreEmp(){
 }
 
 async function cleanupResigned(){
+  // Keep historical attendance, leave, payroll, and payslip records.
+  return;
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);
   const cutStr=dateStr(cutoff);
   const{data:old}=await db.from('employees').select('id,name').eq('status','resigned').lte('resigned_at',cutStr);
@@ -2242,6 +2730,7 @@ function loadProfilePage(){
   const badge = document.getElementById('profile-role-badge');
   badge.textContent = roleMap[user.role]||user.role;
   badge.style.cssText = colorMap[user.role]||'';
+  renderProfileAccountStatus();
   // โหลดสถิติ
   loadProfileStats();
 }
@@ -2256,6 +2745,65 @@ async function loadProfileStats(){
   document.getElementById('p-leave').textContent=(leaves||[]).length;
   const total=(bonuses||[]).reduce((s,x)=>s+(x.bonus_amount||0),0);
   document.getElementById('p-bonus').textContent='฿'+total.toLocaleString();
+}
+
+function renderProfileAccountStatus(){
+  const status=document.getElementById('profile-account-status');
+  const fields=document.getElementById('profile-account-request-fields');
+  const email=document.getElementById('profile-account-email');
+  email.value=user.email||'';
+  if(user.auth_user_id){
+    status.textContent=`เชื่อมบัญชีแล้ว${user.email?' · '+user.email:''}`;
+    fields.style.display='none';
+    return;
+  }
+  fields.style.display='block';
+  status.textContent=user.account_request_status==='pending'
+    ?'ส่งคำขอแล้ว · รอ HR/Owner ตรวจสอบและส่งคำเชิญ'
+    :'ยังไม่ได้เชื่อมบัญชี Email';
+}
+
+async function requestEmployeeAccount(){
+  const email=document.getElementById('profile-account-email').value.trim().toLowerCase();
+  const pin=document.getElementById('profile-account-pin').value.trim();
+  const button=document.getElementById('profile-account-request-button');
+  if(!email||!email.includes('@')){toast('กรุณากรอก Email ให้ถูกต้อง','#E53935');return;}
+  if(!/^\d{4}$/.test(pin)){toast('กรุณากรอก PIN ปัจจุบัน 4 หลัก','#E53935');return;}
+  button.disabled=true;button.textContent='กำลังส่งคำขอ...';
+  try{
+    const response=await fetch(`${SB_URL}/functions/v1/employee-account-request`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({employee_id:user.id,email,pin})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(result.error||'ส่งคำขอไม่สำเร็จ');
+    user.email=email;user.account_request_status='pending';user.account_requested_at=new Date().toISOString();
+    document.getElementById('profile-account-pin').value='';
+    renderProfileAccountStatus();
+    toast('ส่งคำขอให้ HR/Owner แล้ว','#0B9E82');
+  }catch(error){toast(error.message,'#E53935');}
+  finally{button.disabled=false;button.textContent='ส่งคำขอเชื่อมบัญชี';}
+}
+
+async function changePin(){
+  const oldPin=document.getElementById('pin-old').value.trim();
+  const newPin=document.getElementById('pin-new').value.trim();
+  const confirmPin=document.getElementById('pin-confirm').value.trim();
+  const pinPattern=/^\d{4}$/;
+  if(!pinPattern.test(oldPin)||!pinPattern.test(newPin)){
+    toast('PIN ต้องเป็นตัวเลข 4 หลัก','#E53935');return;
+  }
+  if(newPin!==confirmPin){toast('ยืนยัน PIN ใหม่ไม่ตรงกัน','#E53935');return;}
+  if(oldPin===newPin){toast('PIN ใหม่ต้องไม่ซ้ำกับ PIN เดิม','#E53935');return;}
+  const{data:verified,error:verifyError}=await db.from('employees')
+    .select('id').eq('id',user.id).eq('pin',oldPin).eq('status','active').maybeSingle();
+  if(verifyError||!verified){toast('PIN ปัจจุบันไม่ถูกต้อง หรือบัญชีถูกระงับ','#E53935');return;}
+  const{error}=await db.from('employees').update({pin:newPin}).eq('id',user.id).eq('status','active');
+  if(error){toast('เปลี่ยน PIN ไม่สำเร็จ: '+error.message,'#E53935');return;}
+  user.pin=newPin;
+  ['pin-old','pin-new','pin-confirm'].forEach(id=>document.getElementById(id).value='');
+  toast('✅ เปลี่ยน PIN เรียบร้อยแล้ว','#0B9E82');
 }
 
 function showPage(name){
@@ -2341,7 +2889,11 @@ async function confirmShiftAndCheckin(){
 async function doBreakStart(){
   if(!todayAtt?.check_in||todayAtt?.check_out){return;}
   if(todayAtt?.break_start&&!todayAtt?.break_end){toast('อยู่ในช่วงพักแล้ว','#F57F17');return;}
-  const{data,error}=await db.from('attendance').update({break_start:new Date().toISOString()}).eq('id',todayAtt.id).select().single();
+  let data,error;
+  if(loginAuthType==='pin'){
+    try{({attendance:data}=await pinAttendanceRequest('break_start'));}
+    catch(err){error=err;}
+  }else({data,error}=await db.from('attendance').update({break_start:new Date().toISOString()}).eq('id',todayAtt.id).select().single());
   if(error){toast('Error: '+error.message,'#E53935');return;}
   todayAtt=data;updateClockBtns();renderClockLog();
   toast('☕ ออกพักแล้ว '+fmtT(new Date()),'#F57F17');
@@ -2349,7 +2901,11 @@ async function doBreakStart(){
 async function doBreakEnd(){
   if(!todayAtt?.break_start||todayAtt?.break_end){return;}
   const breakMins=Math.floor((new Date()-new Date(todayAtt.break_start))/60000);
-  const{data,error}=await db.from('attendance').update({break_end:new Date().toISOString()}).eq('id',todayAtt.id).select().single();
+  let data,error;
+  if(loginAuthType==='pin'){
+    try{({attendance:data}=await pinAttendanceRequest('break_end'));}
+    catch(err){error=err;}
+  }else({data,error}=await db.from('attendance').update({break_end:new Date().toISOString()}).eq('id',todayAtt.id).select().single());
   if(error){toast('Error: '+error.message,'#E53935');return;}
   todayAtt=data;updateClockBtns();renderClockLog();
   toast('💪 กลับมาทำงานแล้ว พักไป '+breakMins+' นาที','#2E7D32');
@@ -2439,6 +2995,118 @@ async function deleteAnnounce(id, fileUrl){
 
 // LEAVE MANAGEMENT
 let allLeaveData=[];
+let leaveSummaryRows=[];
+
+function escapeLeaveSummaryHtml(value){
+  return String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+}
+function leaveDaysInsideYear(leave,year){
+  const yearStart=new Date(`${year}-01-01T00:00:00`);
+  const yearEnd=new Date(`${year}-12-31T00:00:00`);
+  const leaveStart=new Date(`${leave.start_date}T00:00:00`);
+  const leaveEnd=new Date(`${leave.end_date}T00:00:00`);
+  const overlapStart=new Date(Math.max(yearStart,leaveStart));
+  const overlapEnd=new Date(Math.min(yearEnd,leaveEnd));
+  if(overlapEnd<overlapStart)return 0;
+  const overlapDays=Math.floor((overlapEnd-overlapStart)/86400000)+1;
+  const fullDays=Math.max(1,Math.floor((leaveEnd-leaveStart)/86400000)+1);
+  const recordedDays=Number(leave.days)||fullDays;
+  return Number(Math.min(recordedDays,recordedDays*overlapDays/fullDays).toFixed(2));
+}
+function formatLeaveSummaryDays(value){
+  const number=Number(value)||0;
+  return Number.isInteger(number)?String(number):number.toFixed(2).replace(/0+$/,'').replace(/\.$/,'');
+}
+function leaveSummaryCell(used,quota){
+  const usedText=formatLeaveSummaryDays(used);
+  if(quota===null)return`<strong>${usedText}</strong> วัน`;
+  const remaining=Math.max(0,quota-used);
+  const over=used>quota;
+  return`<strong style="color:${over?'var(--red)':'var(--text)'}">${usedText}</strong> / ${quota}<div class="leave-balance ${over?'warn':''}">${over?`เกินสิทธิ์ ${formatLeaveSummaryDays(used-quota)} วัน`:`เหลือ ${formatLeaveSummaryDays(remaining)} วัน`}</div>`;
+}
+async function openLeaveSummary(){
+  if(!user||!['owner','hr'].includes(user.role)){toast('เฉพาะ Owner หรือ HR เท่านั้น','#E53935');return;}
+  const select=document.getElementById('leave-summary-year');
+  if(!select.options.length){
+    const currentYear=new Date().getFullYear();
+    select.innerHTML=Array.from({length:6},(_,i)=>currentYear-i).map(year=>`<option value="${year}">${year+543}</option>`).join('');
+  }
+  document.getElementById('leave-summary-search').value='';
+  openModal('modal-leave-summary');
+  await loadLeaveSummary();
+}
+async function loadLeaveSummary(){
+  const year=Number(document.getElementById('leave-summary-year').value)||new Date().getFullYear();
+  const yearStart=`${year}-01-01`,yearEnd=`${year}-12-31`;
+  const content=document.getElementById('leave-summary-content');
+  content.innerHTML='<div class="loading-text">กำลังคำนวณวันลา...</div>';
+  const[{data:employees,error:employeeError},{data:leaves,error:leaveError}]=await Promise.all([
+    db.from('employees').select('id,name,department,start_date,resigned_at,status,role').eq('role','employee').order('name'),
+    db.from('leave_requests').select('employee_id,leave_type,start_date,end_date,days,status').eq('status','approved').lte('start_date',yearEnd).gte('end_date',yearStart)
+  ]);
+  if(employeeError||leaveError){
+    content.innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">โหลดข้อมูลวันลาไม่สำเร็จ</div></div>';
+    toast(employeeError?.message||leaveError?.message||'โหลดข้อมูลไม่สำเร็จ','#E53935');
+    return;
+  }
+  const inYear=(employees||[]).filter(employee=>(!employee.start_date||employee.start_date<=yearEnd)&&(!employee.resigned_at||employee.resigned_at>=yearStart));
+  leaveSummaryRows=inYear.map(employee=>{
+    const used={sick:0,personal:0,vacation:0,unpaid:0};
+    (leaves||[]).filter(leave=>leave.employee_id===employee.id).forEach(leave=>{
+      if(Object.hasOwn(used,leave.leave_type))used[leave.leave_type]+=leaveDaysInsideYear(leave,year);
+    });
+    Object.keys(used).forEach(type=>used[type]=Number(used[type].toFixed(2)));
+    return{employee,...used,total:Number(Object.values(used).reduce((sum,value)=>sum+value,0).toFixed(2))};
+  });
+  renderLeaveSummary();
+}
+function filteredLeaveSummaryRows(){
+  const search=document.getElementById('leave-summary-search').value.trim().toLocaleLowerCase('th');
+  return search?leaveSummaryRows.filter(row=>`${row.employee.name} ${row.employee.department||''}`.toLocaleLowerCase('th').includes(search)):leaveSummaryRows;
+}
+function renderLeaveSummary(){
+  const rows=filteredLeaveSummaryRows();
+  const totals=rows.reduce((sum,row)=>{
+    for(const type of ['sick','personal','vacation','unpaid'])sum[type]+=row[type];
+    return sum;
+  },{sick:0,personal:0,vacation:0,unpaid:0});
+  document.getElementById('leave-summary-cards').innerHTML=[
+    ['🏥','ลาป่วย',totals.sick,'var(--red)'],['📋','ลากิจ',totals.personal,'var(--blue)'],
+    ['🌴','พักร้อน',totals.vacation,'var(--teal)'],['💸','ไม่รับค่าจ้าง',totals.unpaid,'var(--orange)']
+  ].map(([icon,label,value,color])=>`<div class="leave-summary-card"><div style="font-size:11px;color:var(--text3)">${icon} ${label}</div><div style="font-size:20px;font-weight:800;color:${color};margin-top:2px">${formatLeaveSummaryDays(value)}</div><div style="font-size:10px;color:var(--text3)">วันรวม</div></div>`).join('');
+  const content=document.getElementById('leave-summary-content');
+  if(!rows.length){content.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">ไม่พบพนักงานในปีที่เลือก</div></div>';return;}
+  content.innerHTML=`<div class="leave-summary-table-wrap"><table class="leave-summary-table">
+    <thead><tr><th style="text-align:left">พนักงาน</th><th>สถานะ</th><th>ลาป่วย</th><th>ลากิจ</th><th>ลาพักร้อน</th><th>ไม่รับค่าจ้าง</th><th>รวม</th></tr></thead>
+    <tbody>${rows.map(row=>`<tr>
+      <td class="left"><strong>${escapeLeaveSummaryHtml(row.employee.name)}</strong><div style="font-size:10px;color:var(--text3);margin-top:2px">${escapeLeaveSummaryHtml(row.employee.department||'')}</div></td>
+      <td>${row.employee.resigned_at?`<span class="leave-badge status-badge-rejected">ลาออก ${fmtDate(row.employee.resigned_at)}</span>`:'<span class="leave-badge status-badge-approved">ทำงาน</span>'}</td>
+      <td>${leaveSummaryCell(row.sick,QUOTAS.sick)}</td>
+      <td>${leaveSummaryCell(row.personal,QUOTAS.personal)}</td>
+      <td>${leaveSummaryCell(row.vacation,QUOTAS.vacation)}</td>
+      <td>${leaveSummaryCell(row.unpaid,null)}</td>
+      <td><strong>${formatLeaveSummaryDays(row.total)}</strong> วัน</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+function exportLeaveSummary(){
+  const rows=filteredLeaveSummaryRows();
+  if(!rows.length){toast('ไม่มีข้อมูลสำหรับ Export','#E53935');return;}
+  const year=Number(document.getElementById('leave-summary-year').value)||new Date().getFullYear();
+  const data=rows.map(row=>({
+    พนักงาน:row.employee.name,แผนก:row.employee.department||'',สถานะ:row.employee.resigned_at?'ลาออก':'ทำงาน',
+    ลาป่วย_ใช้แล้ว:row.sick,ลาป่วย_คงเหลือ:Math.max(0,QUOTAS.sick-row.sick),
+    ลากิจ_ใช้แล้ว:row.personal,ลากิจ_คงเหลือ:Math.max(0,QUOTAS.personal-row.personal),
+    ลาพักร้อน_ใช้แล้ว:row.vacation,ลาพักร้อน_คงเหลือ:Math.max(0,QUOTAS.vacation-row.vacation),
+    ลาไม่รับค่าจ้าง:row.unpaid,วันลารวม:row.total
+  }));
+  const workbook=XLSX.utils.book_new();
+  const sheet=XLSX.utils.json_to_sheet(data);
+  sheet['!cols']=[{wch:30},{wch:20},{wch:12},...Array(8).fill({wch:18})];
+  XLSX.utils.book_append_sheet(workbook,sheet,'สรุปวันลา');
+  XLSX.writeFile(workbook,`สรุปวันลาสะสม_${year+543}.xlsx`);
+}
+
 async function openLeaveManage(){
   const{data}=await db.from('leave_requests').select('*,employees(name)').order('start_date',{ascending:false});
   allLeaveData=data||[];
@@ -2839,6 +3507,53 @@ function openMyPayslip(){
   loadMyPayslip();
 }
 
+function safePayslipExportName(name){
+  return String(name||'payslip').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
+}
+
+function escapePayslipHtml(str){
+  return String(str||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function openMyPayslipPrintView(){
+  const source=document.getElementById('my-payslip-content');
+  if(!source||!source.innerHTML.trim()){alert('ยังไม่มีสลิปสำหรับส่งออก');return;}
+  const hasPlaceholder=source.textContent.includes('เลือกเดือนแล้วกด')||source.textContent.includes('กำลังโหลด')||source.textContent.includes('ยังไม่ได้กำหนด');
+  if(hasPlaceholder){alert('กรุณาโหลดสลิปเงินเดือนก่อนส่งออก');return;}
+  const ym=document.getElementById('ps-month')?.value||'';
+  const title=`สลิปเงินเดือน ${user?.name||''} ${ym}`.trim();
+  const cleanTitle=escapePayslipHtml(title);
+  const win=window.open('','_blank','width=820,height=920');
+  if(!win){alert('กรุณาอนุญาต popup เพื่อส่งออก PDF');return;}
+  win.document.write(`<!doctype html><html lang="th"><head><meta charset="UTF-8">
+    <title>${cleanTitle}</title>
+    <style>
+      *{box-sizing:border-box}
+      :root{--teal:#0B9E82;--teal2:#0D7A65;--teal-light:#E8F8F5;--teal-bg:#F0FBF8;--red:#E53935;--gray:#F5F6FA;--text:#1A1A2E;--text2:#4A4A6A;--text3:#8A8AAA;--white:#fff;--border:#E8E9F0}
+      body{margin:0;background:var(--gray);color:var(--text);font-family:'Noto Sans Thai','Helvetica Neue',Arial,sans-serif;font-size:13px}
+      .sheet{width:min(720px,100%);margin:24px auto;background:#fff;padding:28px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+      .brand{font-size:18px;font-weight:800;color:var(--teal2);margin-bottom:4px}
+      .title{font-size:14px;font-weight:700;margin-bottom:18px;color:var(--text2)}
+      table{width:100%;border-collapse:collapse;font-size:12px}
+      .actions{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--border);padding:12px;text-align:center}
+      button{padding:10px 18px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-weight:700;cursor:pointer}
+      @media print{body{background:#fff}.sheet{width:100%;margin:0;padding:0;box-shadow:none;border-radius:0}.actions{display:none}@page{size:A4;margin:14mm}}
+    </style></head><body>
+      <div class="sheet">
+        <div class="brand">LOEI SMART GROUP</div>
+        <div class="title">${cleanTitle}</div>
+        ${source.innerHTML}
+      </div>
+      <div class="actions"><button onclick="window.print()">ดาวน์โหลด PDF / พิมพ์</button></div>
+      <script>document.title=${JSON.stringify(safePayslipExportName(title))};setTimeout(()=>window.print(),250);<\/script>
+    </body></html>`);
+  win.document.close();
+}
+
+function exportMyPayslipPdf(){
+  openMyPayslipPrintView();
+}
+
 async function loadMyPayslip(){
   const ym=document.getElementById('ps-month').value;
   if(!ym||!user){return;}
@@ -2851,33 +3566,50 @@ async function loadMyPayslip(){
 
   document.getElementById('my-payslip-content').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">กำลังโหลด...</div>';
 
-  const[{data:cfg,error:cfgErr},{data:atts},{data:unpaidLv}]=await Promise.all([
+  const[{data:cfg,error:cfgErr},{data:atts},{data:unpaidLv},{data:finalizedItems,error:finalizedErr}]=await Promise.all([
     db.from('employee_salary').select('*').eq('employee_id',user.id).maybeSingle(),
     db.from('attendance').select('*').eq('employee_id',user.id).gte('work_date',start).lte('work_date',end),
-    db.from('leave_requests').select('days').eq('employee_id',user.id).eq('status','approved').eq('leave_type','unpaid').gte('start_date',start).lte('end_date',end)
+    db.from('leave_requests').select('days').eq('employee_id',user.id).eq('status','approved').eq('leave_type','unpaid').lte('start_date',end).gte('end_date',start),
+    db.from('payroll_items')
+      .select('*,payroll_runs!inner(year_month,run_type,status,pay_date)')
+      .eq('employee_id',user.id)
+      .eq('payroll_runs.year_month',ym)
+      .eq('payroll_runs.run_type','final')
+      .in('payroll_runs.status',['confirmed','paid'])
+      .order('created_at',{ascending:false})
+      .limit(1)
   ]);
   if(cfgErr){document.getElementById('my-payslip-content').innerHTML=`<div style="text-align:center;padding:24px;color:#E53935">เกิดข้อผิดพลาด: ${cfgErr.message}</div>`;return;}
+  if(finalizedErr){console.warn('โหลดรอบจ่ายที่ยืนยันแล้วไม่สำเร็จ',finalizedErr);}
 
-  const base=cfg?.base_salary||0;
-  const workDays=(atts||[]).filter(a=>a.check_in).length;
-  const lateCount=(atts||[]).filter(a=>attIsLate(a,user.shift_id)).length;
+  const finalItem=(finalizedItems||[])[0]||null;
+  const isFinalized=!!finalItem;
+  const base=finalItem?.base_salary??cfg?.base_salary??0;
+  const workDays=finalItem?.work_days??(atts||[]).filter(a=>a.check_in).length;
+  const lateCount=finalItem?.late_count??(atts||[]).filter(a=>attIsLate(a,user.shift_id)).length;
   const unpaidDays=(unpaidLv||[]).reduce((s,l)=>s+(l.days||0),0);
-  const proratedBase=Math.round((base-base/30*unpaidDays)*100)/100;
-  const posPay=cfg?.position_pay||0;
-  const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
-  const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
-  const otherPay=cfg?.other_pay||0;
+  const proratedBase=finalItem?.base_salary??Math.round((base-base/30*unpaidDays)*100)/100;
+  const posPay=finalItem?.position_pay??cfg?.position_pay??0;
+  const licensePay=finalItem?.license_pay??(cfg?.driving_license?cfg?.license_pay||0:0);
+  const comm=finalItem?.commission??(cfg?.commission_type==='fixed'?cfg?.commission_value||0:0);
+  const otherPay=finalItem?.other_income??cfg?.other_pay??0;
   const otherDesc=cfg?.other_desc||'เงินเพิ่มอื่นๆ';
-  const d1=cfg?.other_deduct||0, d1n=cfg?.other_deduct_desc||'รายการหัก 1';
-  const d2=cfg?.other_deduct2||0, d2n=cfg?.other_deduct2_desc||'รายการหัก 2';
-  const d3=cfg?.other_deduct3||0, d3n=cfg?.other_deduct3_desc||'รายการหัก 3';
-  const totalDeduct=d1+d2+d3;
-  const otMins=(atts||[]).reduce((s,a)=>s+(a.ot_minutes||0),0);
-  const otPay=Math.round(otMins/60*(base/30/8)*1.5*100)/100;
-  const gross=proratedBase+posPay+licensePay+comm+otherPay+otPay;
-  const net=gross-totalDeduct;
+  const d1=finalItem?.other_deduct??cfg?.other_deduct??0, d1n=isFinalized?'รายการหักอื่นๆ':cfg?.other_deduct_desc||'รายการหัก 1';
+  const d2=isFinalized?0:cfg?.other_deduct2||0, d2n=cfg?.other_deduct2_desc||'รายการหัก 2';
+  const d3=isFinalized?0:cfg?.other_deduct3||0, d3n=cfg?.other_deduct3_desc||'รายการหัก 3';
+  const advanceDeduct=isFinalized?(finalItem.advance_deduct||finalItem.advance_paid||0):0;
+  const socialDeduct=finalItem?.social_security||0;
+  const taxDeduct=finalItem?.tax||0;
+  const roundIncome=finalItem?.manual_income_adjustment||0;
+  const roundDeduct=finalItem?.manual_deduction_adjustment||0;
+  const roundReason=escapePayslipHtml(finalItem?.adjustment_reason||'');
+  const totalDeduct=finalItem?.total_deduct??(d1+d2+d3);
+  const otMins=finalItem?.ot_minutes??(atts||[]).reduce((s,a)=>s+(a.ot_minutes||0),0);
+  const otPay=finalItem?.ot_pay??Math.round(otMins/60*(base/30/8)*1.5*100)/100;
+  const gross=finalItem?.gross_pay??(proratedBase+posPay+licensePay+comm+otherPay+otPay);
+  const net=finalItem?.net_pay??(gross-totalDeduct);
 
-  if(!cfg){
+  if(!cfg&&!finalItem){
     document.getElementById('my-payslip-content').innerHTML='<div style="text-align:center;padding:24px;color:var(--text3)">ยังไม่ได้กำหนดเงินเดือน<br>กรุณาติดต่อ HR</div>';
     return;
   }
@@ -2886,7 +3618,7 @@ async function loadMyPayslip(){
     <div style="background:#E8F8F5;border-radius:10px;padding:12px 14px;margin-bottom:12px;text-align:center">
       <div style="font-size:11px;color:#0D7A65;margin-bottom:2px">เงินเดือน ${thaiM(ym)}</div>
       <div style="font-size:28px;font-weight:800;color:#0B9E82">฿${fmt(net)}</div>
-      <div style="font-size:11px;color:#0D7A65;margin-top:2px">รับสุทธิ</div>
+      <div style="font-size:11px;color:#0D7A65;margin-top:2px">รับสุทธิ${isFinalized?' · ยืนยันรอบจ่ายแล้ว':' · ประมาณการ'}</div>
     </div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:8px;text-align:center">มา ${workDays} วัน · สาย ${lateCount} ครั้ง${otMins?` · OT ${(otMins/60).toFixed(1)} ชม.`:''}</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -2897,10 +3629,15 @@ async function loadMyPayslip(){
       ${comm?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่าคอมมิชชั่น</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(comm)}</td></tr>`:''}
       ${otherPay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${otherDesc}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(otherPay)}</td></tr>`:''}
       ${otPay?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ค่า OT</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(otPay)}</td></tr>`:''}
+      ${roundIncome?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ปรับเพิ่มรอบนี้${roundReason?` — ${roundReason}`:''}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600">฿${fmt(roundIncome)}</td></tr>`:''}
       <tr style="background:#F0FBF8"><td colspan="2" style="padding:6px 10px;font-weight:700;color:#0D7A65;font-size:11px">รายหัก</td></tr>
       ${d1?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${d1n}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(d1)})</td></tr>`:''}
       ${d2?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${d2n}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(d2)})</td></tr>`:''}
       ${d3?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">${d3n}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(d3)})</td></tr>`:''}
+      ${advanceDeduct?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">หักเงินจ่ายล่วงหน้า</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(advanceDeduct)})</td></tr>`:''}
+      ${socialDeduct?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ประกันสังคม</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(socialDeduct)})</td></tr>`:''}
+      ${taxDeduct?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ภาษี</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(taxDeduct)})</td></tr>`:''}
+      ${roundDeduct?`<tr><td style="padding:6px 10px;border-bottom:1px solid var(--border)">ปรับลดรอบนี้${roundReason?` — ${roundReason}`:''}</td><td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:var(--red)">(฿${fmt(roundDeduct)})</td></tr>`:''}
       ${totalDeduct?'':`<tr><td colspan="2" style="padding:6px 10px;color:var(--text3);font-size:11px">— ไม่มีรายการหัก —</td></tr>`}
     </table>`;
 }
