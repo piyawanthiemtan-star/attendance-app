@@ -599,18 +599,19 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
     <div class="page" id="page-profile">
       <div style="text-align:center;padding:24px 0 16px">
         <div id="profile-avatar" style="width:72px;height:72px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin-bottom:0;position:relative;overflow:hidden">
+          <span id="profile-initials">--</span>
           <img id="profile-photo" src="" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:none;">
         </div>
         <label id="profile-photo-btn" style="cursor:pointer;display:inline-block;margin-top:6px;margin-bottom:8px;font-size:12px;color:var(--teal2);font-weight:600;">
           📷 เปลี่ยนรูปโปรไฟล์
-          <input type="file" id="profile-photo-input" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(this)">
+          <input type="file" id="profile-photo-input" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="uploadProfilePhoto(this)">
         </label>
         <div style="font-size:18px;font-weight:700" id="profile-name">--</div>
         <div style="font-size:13px;color:var(--text3);margin-top:4px" id="profile-info">--</div>
         <div id="profile-role-badge" style="display:inline-block;margin-top:8px;font-size:12px;padding:4px 14px;border-radius:20px;font-weight:600"></div>
       </div>
 
-      <div class="card" style="margin-bottom:12px">
+      <div class="card" id="profile-stats-card" style="margin-bottom:12px">
         <div class="card-title">ข้อมูลการทำงาน</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div style="background:var(--gray);border-radius:10px;padding:12px;text-align:center">
@@ -632,7 +633,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         </div>
       </div>
 
-      <button onclick="openMyPayslip()" style="width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#0B9E82,#0D7A65);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px">
+      <button id="profile-payslip-button" onclick="openMyPayslip()" style="width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,#0B9E82,#0D7A65);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px">
         💵 ดูสลิปเงินเดือนของฉัน
       </button>
 
@@ -649,7 +650,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="profile-pin-card">
         <div class="card-title">🔐 เปลี่ยน PIN</div>
         <div style="font-size:12px;color:var(--text3);margin-bottom:12px">PIN ใช้สำหรับล็อกอินเข้าระบบ ควรเก็บไว้เป็นความลับ</div>
         <label class="modal-label" style="margin-top:0">PIN ปัจจุบัน</label>
@@ -1351,6 +1352,7 @@ async function initPinAttendanceApp(){
   document.querySelectorAll('.nav-item').forEach(el=>el.style.display='none');
   document.getElementById('nav-clock').style.display='flex';
   document.getElementById('nav-leave').style.display='flex';
+  document.getElementById('nav-profile').style.display='flex';
   document.getElementById('btn-open-leave').style.display='none';
   document.getElementById('pin-leave-readonly').style.display='block';
   clockTick=setInterval(tickClock,1000);tickClock();
@@ -2627,27 +2629,53 @@ async function deleteBranch(){
 // ========== PHOTO FUNCTIONS ==========
 async function uploadPhotoToStorage(empId, file){
   const ext = file.name.split('.').pop().toLowerCase();
-  const allowed = ['jpg','jpeg','png','webp','gif'];
+  const allowed = ['jpg','jpeg','png','webp'];
   if(!allowed.includes(ext)){toast('รองรับเฉพาะ JPG, PNG, WEBP','#E53935');return null;}
   if(file.size > 5*1024*1024){toast('รูปใหญ่เกิน 5MB','#E53935');return null;}
 
   const fileName = `${empId}.${ext}`;
-  const path = `employee-photos/${fileName}`;
+  const bucket = db.storage.from('employee-photos');
+  const oldNames = ['jpg','jpeg','png','webp'].filter(oldExt=>oldExt!==ext).map(oldExt=>`${empId}.${oldExt}`);
+  if(oldNames.length)await bucket.remove(oldNames);
+  const{error}=await bucket.upload(fileName,file,{contentType:file.type,cacheControl:'3600',upsert:true});
+  if(error){toast('อัปโหลดรูปไม่ได้: '+error.message,'#E53935');return null;}
+  const{data}=bucket.getPublicUrl(fileName);
+  return `${data.publicUrl}?t=${Date.now()}`;
+}
 
-  // ลองลบไฟล์เก่าก่อน (ถ้ามี)
-  await fetch(`${SB_URL}/storage/v1/object/${path}`, {
-    method:'DELETE',
-    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}
-  });
+async function compressProfilePhoto(file){
+  const allowed=['image/jpeg','image/png','image/webp'];
+  if(!allowed.includes(file.type))throw new Error('รองรับเฉพาะ JPG, PNG และ WEBP');
+  if(file.size>12*1024*1024)throw new Error('รูปต้นฉบับใหญ่เกิน 12MB');
+  const objectUrl=URL.createObjectURL(file);
+  try{
+    const image=await new Promise((resolve,reject)=>{
+      const img=new Image();
+      img.onload=()=>resolve(img);
+      img.onerror=()=>reject(new Error('เปิดไฟล์รูปไม่ได้ กรุณาเลือกรูป JPG, PNG หรือ WEBP'));
+      img.src=objectUrl;
+    });
+    const maxSide=800;
+    const scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+    canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+    const context=canvas.getContext('2d');
+    if(!context)throw new Error('อุปกรณ์นี้ไม่สามารถเตรียมรูปได้');
+    context.drawImage(image,0,0,canvas.width,canvas.height);
+    return canvas.toDataURL('image/jpeg',.82);
+  }finally{URL.revokeObjectURL(objectUrl);}
+}
 
-  // อัปโหลดใหม่
-  const res = await fetch(`${SB_URL}/storage/v1/object/${path}`, {
-    method:'POST',
-    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':file.type,'x-upsert':'true'},
-    body:file
-  });
-  if(!res.ok){const e=await res.json();toast('อัปโหลดรูปไม่ได้: '+(e.error||'ลองใหม่'),'#E53935');return null;}
-  return `${SB_URL}/storage/v1/object/public/${path}?t=${Date.now()}`;
+function applyProfilePhoto(url){
+  user.photo_url=url;
+  const img=document.getElementById('profile-photo');
+  img.src=url;img.style.display='block';
+  const avatarEl=document.getElementById('profile-avatar');
+  document.getElementById('profile-initials').style.display='none';
+  avatarEl.style.background='';
+  const hdrAv=document.getElementById('hdr-avatar');
+  hdrAv.innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
 }
 
 async function uploadProfilePhoto(input){
@@ -2655,21 +2683,22 @@ async function uploadProfilePhoto(input){
   const btn = document.getElementById('profile-photo-btn');
   btn.style.opacity='.5';
   toast('⏳ กำลังอัปโหลดรูป...','#534AB7');
-  const url = await uploadPhotoToStorage(user.id, file);
-  if(!url){btn.style.opacity='1';return;}
-  const{error}=await db.from('employees').update({photo_url:url}).eq('id',user.id);
-  if(error){toast('บันทึกไม่ได้: '+error.message,'#E53935');btn.style.opacity='1';return;}
-  user.photo_url = url;
-  // อัปเดต UI
-  const img = document.getElementById('profile-photo');
-  img.src = url; img.style.display = 'block';
-  const avatarEl = document.getElementById('profile-avatar');
-  avatarEl.style.background = '';
-  // อัปเดต hdr-avatar ด้วย
-  const hdrAv = document.getElementById('hdr-avatar');
-  hdrAv.innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-  toast('✅ เปลี่ยนรูปโปรไฟล์แล้ว','#0B9E82');
-  btn.style.opacity='1';
+  try{
+    let url;
+    if(loginAuthType==='pin'){
+      const photoDataUrl=await compressProfilePhoto(file);
+      const result=await pinAttendanceRequest('update_profile_photo',{photo_data_url:photoDataUrl});
+      url=result.photo_url;
+    }else{
+      url=await uploadPhotoToStorage(user.id,file);
+      if(!url)return;
+      const{error}=await db.from('employees').update({photo_url:url}).eq('id',user.id);
+      if(error)throw new Error('บันทึกรูปไม่ได้: '+error.message);
+    }
+    applyProfilePhoto(url);
+    toast('✅ เปลี่ยนรูปโปรไฟล์แล้ว','#0B9E82');
+  }catch(error){toast(error.message||'เปลี่ยนรูปโปรไฟล์ไม่สำเร็จ','#E53935');}
+  finally{btn.style.opacity='1';input.value='';}
 }
 
 function previewEmpPhoto(input){
@@ -2709,13 +2738,16 @@ function loadProfilePage(){
   const[bg,tx] = AV[i];
   const avatarEl = document.getElementById('profile-avatar');
   const photoImg = document.getElementById('profile-photo');
+  const initials = document.getElementById('profile-initials');
   if(user.photo_url){
     photoImg.src = user.photo_url;
     photoImg.style.display = 'block';
+    initials.style.display = 'none';
     avatarEl.style.background = bg;
   } else {
     photoImg.style.display = 'none';
-    avatarEl.textContent = user.name.substring(0,2);
+    initials.textContent = user.name.substring(0,2);
+    initials.style.display = '';
     avatarEl.style.background = bg;
     avatarEl.style.color = tx;
   }
@@ -2730,9 +2762,12 @@ function loadProfilePage(){
   const badge = document.getElementById('profile-role-badge');
   badge.textContent = roleMap[user.role]||user.role;
   badge.style.cssText = colorMap[user.role]||'';
+  const isPin=loginAuthType==='pin';
+  document.getElementById('profile-stats-card').style.display=isPin?'none':'';
+  document.getElementById('profile-payslip-button').style.display=isPin?'none':'flex';
   renderProfileAccountStatus();
-  // โหลดสถิติ
-  loadProfileStats();
+  // ข้อมูลสถิติและสลิปเป็นข้อมูลส่วนตัวเชิงลึก จึงเปิดผ่านบัญชี Email เท่านั้น
+  if(!isPin)loadProfileStats();
 }
 
 async function loadProfileStats(){
@@ -2796,6 +2831,16 @@ async function changePin(){
   }
   if(newPin!==confirmPin){toast('ยืนยัน PIN ใหม่ไม่ตรงกัน','#E53935');return;}
   if(oldPin===newPin){toast('PIN ใหม่ต้องไม่ซ้ำกับ PIN เดิม','#E53935');return;}
+  if(loginAuthType==='pin'){
+    if(normalizePinInput(oldPin)!==pinSessionSecret){toast('PIN ปัจจุบันไม่ถูกต้อง','#E53935');return;}
+    try{
+      await pinAttendanceRequest('change_pin',{new_pin:newPin});
+      pinSessionSecret=newPin;
+      ['pin-old','pin-new','pin-confirm'].forEach(id=>document.getElementById(id).value='');
+      toast('✅ เปลี่ยน PIN เรียบร้อยแล้ว','#0B9E82');
+    }catch(error){toast(error.message||'เปลี่ยน PIN ไม่สำเร็จ','#E53935');}
+    return;
+  }
   const{data:verified,error:verifyError}=await db.from('employees')
     .select('id').eq('id',user.id).eq('pin',oldPin).eq('status','active').maybeSingle();
   if(verifyError||!verified){toast('PIN ปัจจุบันไม่ถูกต้อง หรือบัญชีถูกระงับ','#E53935');return;}
