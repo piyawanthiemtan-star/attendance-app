@@ -63,6 +63,20 @@
       const message = document.getElementById('message');
       const button = document.getElementById('submit-button');
 
+      const hasAuthCallback = (() => {
+        const query = new URLSearchParams(location.search);
+        const queryKeys = ['code', 'token_hash', 'type', 'error', 'error_description'];
+        const hash = location.hash.replace(/^#/, '');
+        const hashParams = new URLSearchParams(hash);
+        const hashKeys = ['access_token', 'refresh_token', 'type', 'error', 'error_description'];
+        return queryKeys.some((key) => query.has(key)) || hashKeys.some((key) => hashParams.has(key));
+      })();
+
+      if (!hasAuthCallback) {
+        location.replace('./attendance-app.html?v=18');
+        return;
+      }
+
       const showMessage = (text, type) => {
         message.textContent = text;
         message.className = `message ${type}`;
