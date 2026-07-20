@@ -1296,7 +1296,7 @@ async function requestAuthPasswordReset(){
   if(!email){showLoginError('กรุณากรอกอีเมลก่อน แล้วกดตั้งรหัสใหม่');return;}
   button.disabled=true;button.textContent='กำลังส่งลิงก์...';
   try{
-    await LSMGAuth.requestPasswordReset(db,email,`${location.origin}/index.html`);
+    await LSMGAuth.requestPasswordReset(db,email,new URL('index.html',location.href).href);
     showLoginError('ส่งลิงก์ตั้งรหัสผ่านแล้ว กรุณาตรวจสอบอีเมลและกล่อง Spam');
   }catch(error){showLoginError(error.message);}
   finally{button.disabled=false;button.textContent='ลืมรหัสผ่าน / ตั้งรหัสใหม่';}
@@ -2362,7 +2362,7 @@ async function inviteEmployeeAccount(){
   const button=document.getElementById('empf-invite-account');
   button.disabled=true;button.textContent='กำลังส่ง...';
   try{
-    await invokeAdminUserAction('invite_user',{email,redirect_to:`${location.origin}/index.html`});
+    await invokeAdminUserAction('invite_user',{email,redirect_to:new URL('index.html',location.href).href});
     toast('ส่งคำเชิญตั้งรหัสผ่านไปยัง Email แล้ว','#0B9E82');
     closeModal('modal-emp-form');await loadEmpList();
   }catch(error){toast(error.message,'#E53935');}
@@ -2375,7 +2375,7 @@ async function sendEmployeePasswordReset(){
   const button=document.getElementById('empf-reset-account');
   button.disabled=true;button.textContent='กำลังส่ง...';
   try{
-    await LSMGAuth.requestPasswordReset(db,email,`${location.origin}/index.html`);
+    await LSMGAuth.requestPasswordReset(db,email,new URL('index.html',location.href).href);
     toast('ส่งลิงก์ตั้งรหัสผ่านใหม่แล้ว','#0B9E82');
   }catch(error){toast(error.message,'#E53935');}
   finally{button.disabled=false;button.textContent='ส่งตั้งรหัสใหม่';}
