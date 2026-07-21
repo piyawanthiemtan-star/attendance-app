@@ -64,6 +64,7 @@ tr:hover td{background:#F8FFFE}
 .badge-leave{background:var(--blue-light);color:var(--blue)}
 .badge-holiday{background:#F3E5F5;color:#6A1B9A}
 .badge-unscheduled{background:#FFF8E1;color:#8A4B00}
+.badge-pending{background:#FFF8E1;color:#8A4B00}
 .late-min{color:var(--orange);font-weight:600}
 .ot-hrs{color:var(--blue);font-weight:600}
 .break-over{background:var(--red-light)!important;color:var(--red);font-weight:700}
@@ -220,6 +221,16 @@ function workPatternForDate(patterns,employeeId,date){
     .filter(p=>p.employee_id===employeeId&&p.effective_from<=date&&(!p.effective_to||p.effective_to>=date))
     .sort((a,b)=>b.effective_from.localeCompare(a.effective_from))[0]||null;
 }
+function dayOffSwapForDate(swaps,employeeId,date,statuses=['approved']){
+  return(swaps||[]).find(s=>s.employee_id===employeeId&&statuses.includes(s.status)
+    &&(s.replacement_off_date===date||s.replacement_work_date===date))||null;
+}
+function scheduleStateForDate(pattern,swaps,employeeId,date){
+  const swap=dayOffSwapForDate(swaps,employeeId,date,['approved']);
+  if(swap?.replacement_off_date===date)return{isOff:true,swap,label:'วันหยุดสลับ'};
+  if(swap?.replacement_work_date===date)return{isOff:false,swap,label:'วันทำงานชดเชย'};
+  return{isOff:!!pattern&&pattern.weekly_off_days.includes(new Date(date+'T00:00:00').getDay()),swap:null,label:'วันหยุดประจำสัปดาห์'};
+}
 
 async function doReportLogin(){
   const email=document.getElementById('report-login-email').value.trim().toLowerCase();
@@ -313,12 +324,16 @@ async function loadReport(){
   const{data:atts}=await attQ;
 
   // Load leaves
-  const[{data:leaves},{data:workPatterns,error:workPatternError}]=await Promise.all([
+  const[{data:leaves},{data:workPatterns,error:workPatternError},{data:dayOffSwaps,error:dayOffSwapError}]=await Promise.all([
     db.from('leave_requests').select('*').eq('status','approved').lte('start_date',end).gte('end_date',start),
-    db.from('employee_work_patterns').select('*').lte('effective_from',end)
+    db.from('employee_work_patterns').select('*').lte('effective_from',end),
+    db.from('employee_day_off_swaps').select('*')
+      .gte('payroll_month',start.slice(0,7)+'-01').lte('payroll_month',end.slice(0,7)+'-01')
+      .in('status',['pending','approved'])
   ]);
-  if(workPatternError){
-    document.getElementById('report-content').innerHTML=`<div class="empty" style="color:var(--red)">โหลดตารางวันหยุดไม่ได้: ${workPatternError.message}</div>`;
+  if(workPatternError||dayOffSwapError){
+    const loadError=workPatternError||dayOffSwapError;
+    document.getElementById('report-content').innerHTML=`<div class="empty" style="color:var(--red)">โหลดตารางวันหยุดไม่ได้: ${loadError.message}</div>`;
     return;
   }
 
@@ -343,7 +358,7 @@ async function loadReport(){
     const empAtts=(atts||[]).filter(a=>a.employee_id===emp.id);
     const empLeaves=(leaves||[]).filter(l=>l.employee_id===emp.id);
 
-    let empDays=0,empLate=0,empLateMin=0,empAbsent=0,empLeave=0,empOT=0,empUnscheduled=0;
+    let empDays=0,empLate=0,empLateMin=0,empAbsent=0,empLeave=0,empOT=0,empUnscheduled=0,empPendingSwap=0;
     const rows=[];
     const empRawData=[];
 
@@ -352,7 +367,9 @@ async function loadReport(){
       const att=empAtts.find(a=>a.work_date===date);
       const lv=empLeaves.find(l=>l.start_date<=date&&l.end_date>=date);
       const pattern=workPatternForDate(workPatterns,emp.id,date);
-      const isWeeklyOff=pattern&&pattern.weekly_off_days.includes(dt.getDay());
+      const schedule=scheduleStateForDate(pattern,dayOffSwaps,emp.id,date);
+      const isWeeklyOff=schedule.isOff;
+      const pendingSwap=dayOffSwapForDate(dayOffSwaps,emp.id,date,['pending']);
       const inService=employeeInServiceOnDate(emp,date);
 
       let status='',cin='--',breakStart='--',breakEnd='--',cout='--',lateMins=0,otMins=0,note='',rowClass='',breakMins=null;
@@ -378,19 +395,23 @@ async function loadReport(){
           // OT
           if(rShift.has_ot&&att.ot_minutes){otMins=att.ot_minutes;empOT+=otMins/60;totOT+=otMins/60;}
         } else status='ok';
-        if(isWeeklyOff)note='มาทำงานในวันหยุดประจำสัปดาห์';
+        if(schedule.swap?.replacement_off_date===date)note='มาทำงานในวันหยุดสลับ';
+        else if(isWeeklyOff)note='มาทำงานในวันหยุดประจำสัปดาห์';
+        if(pendingSwap)note+=(note?' · ':'')+'รายการสลับวันหยุดรออนุมัติ';
       } else if(date>today){
         status='future';note='ยังไม่ถึงวันทำงาน';
       } else if(!inService){
         status='not_applicable';note=emp.start_date&&date<emp.start_date?'ยังไม่เริ่มงาน':'พ้นสภาพแล้ว';
       } else if(emp.attendance_required===false){
         status='exempt';note='ยกเว้นการลงเวลา';
-      } else if(isWeeklyOff){
-        status='holiday';note='วันหยุดประจำสัปดาห์';
       } else if(lv){
         status='leave';empLeave++;totLeave++;
         const typeMap={sick:'ลาป่วย',personal:'ลากิจ',vacation:'ลาพักร้อน',unpaid:'ลาหักเงิน'};
         note=typeMap[lv.leave_type]||lv.leave_type;
+      } else if(pendingSwap){
+        status='pending_swap';empPendingSwap++;note='รายการสลับวันหยุดรอ Owner อนุมัติ';
+      } else if(isWeeklyOff){
+        status='holiday';note=schedule.label;
       } else if(!pattern){
         status='unscheduled';empUnscheduled++;note='ยังไม่กำหนดวันหยุดประจำสัปดาห์';
       } else {
@@ -399,7 +420,7 @@ async function loadReport(){
 
       const breakOver=breakMins!==null&&breakMins>BREAK_LIMIT_MINUTES;
 
-      const badgeMap={ok:'<span class="badge badge-ok">✅ ปกติ</span>',late:`<span class="badge badge-late">⚠️ สาย ${lateMins}น.</span>`,absent:'<span class="badge badge-absent">❌ ขาด</span>',leave:'<span class="badge badge-leave">📋 ลา</span>',holiday:'<span class="badge badge-holiday">วันหยุด</span>',unscheduled:'<span class="badge badge-unscheduled">รอตั้งตาราง</span>',exempt:'<span class="badge badge-holiday">ยกเว้นลงเวลา</span>',not_applicable:'<span class="badge badge-holiday">—</span>',future:'<span class="badge badge-holiday">ยังไม่ถึงวัน</span>'};
+      const badgeMap={ok:'<span class="badge badge-ok">✅ ปกติ</span>',late:`<span class="badge badge-late">⚠️ สาย ${lateMins}น.</span>`,absent:'<span class="badge badge-absent">❌ ขาด</span>',leave:'<span class="badge badge-leave">📋 ลา</span>',holiday:'<span class="badge badge-holiday">วันหยุด</span>',pending_swap:'<span class="badge badge-pending">รออนุมัติสลับวันหยุด</span>',unscheduled:'<span class="badge badge-unscheduled">รอตั้งตาราง</span>',exempt:'<span class="badge badge-holiday">ยกเว้นลงเวลา</span>',not_applicable:'<span class="badge badge-holiday">—</span>',future:'<span class="badge badge-holiday">ยังไม่ถึงวัน</span>'};
 
       rows.push(`<tr class="${status==='absent'?'':''}">
         <td>${dt.getDate()}</td>
@@ -422,7 +443,7 @@ async function loadReport(){
         พัก_นาที:breakMins??'', เตือนพักเกิน:breakOver?'พักเกิน 60 นาที':'',
         เวลาออก:cout==='--'?'':cout,
         สาย_นาที:lateMins>5?lateMins:'', OT_ชม:otMins>0?(otMins/60).toFixed(1):'',
-        สถานะ:status==='ok'?'ปกติ':status==='late'?'สาย':status==='absent'?'ขาด':status==='leave'?'ลา':status==='holiday'?'หยุด':status==='unscheduled'?'รอตั้งตาราง':status==='exempt'?'ยกเว้นลงเวลา':status==='not_applicable'?'ไม่อยู่ในช่วงจ้าง':status==='future'?'ยังไม่ถึงวัน':'',
+        สถานะ:status==='ok'?'ปกติ':status==='late'?'สาย':status==='absent'?'ขาด':status==='leave'?'ลา':status==='holiday'?'หยุด':status==='pending_swap'?'รออนุมัติสลับวันหยุด':status==='unscheduled'?'รอตั้งตาราง':status==='exempt'?'ยกเว้นลงเวลา':status==='not_applicable'?'ไม่อยู่ในช่วงจ้าง':status==='future'?'ยังไม่ถึงวัน':'',
         หมายเหตุ:note
       });
     });
@@ -434,8 +455,8 @@ async function loadReport(){
       <td colspan="4">มาทำงาน <strong>${empDays}</strong> วัน</td>
       <td>${empLate>0?`<span class="late-min">${empLate}ครั้ง ${empLateMin}น.</span>`:'ไม่สาย'}</td>
       <td>${empOT>0?`<span class="ot-hrs">${empOT.toFixed(1)}ชม.</span>`:'--'}</td>
-      <td>${emp.attendance_required===false?'<span class="badge badge-holiday">ยกเว้นลงเวลา</span>':empUnscheduled>0?'<span class="badge badge-unscheduled">รอตรวจตาราง</span>':empLate===0&&empLeave===0&&empAbsent===0?'<span class="badge badge-ok">✅ ได้เบี้ย</span>':'<span class="badge badge-absent">❌ ไม่ได้เบี้ย</span>'}</td>
-      <td style="color:var(--text3)">ลา ${empLeave}วัน | ขาด ${empAbsent}วัน${empUnscheduled?` | รอตาราง ${empUnscheduled}วัน`:''}</td>
+      <td>${emp.attendance_required===false?'<span class="badge badge-holiday">ยกเว้นลงเวลา</span>':empUnscheduled>0||empPendingSwap>0?'<span class="badge badge-unscheduled">รอตรวจตาราง</span>':empLate===0&&empLeave===0&&empAbsent===0?'<span class="badge badge-ok">✅ ได้เบี้ย</span>':'<span class="badge badge-absent">❌ ไม่ได้เบี้ย</span>'}</td>
+      <td style="color:var(--text3)">ลา ${empLeave}วัน | ขาด ${empAbsent}วัน${empUnscheduled?` | รอตาราง ${empUnscheduled}วัน`:''}${empPendingSwap?` | รออนุมัติ ${empPendingSwap}วัน`:''}</td>
     </tr>`;
 
     return`<div class="emp-section">
@@ -451,6 +472,7 @@ async function loadReport(){
           ${empAbsent>0?`<span class="stat-pill" style="background:var(--red-light);color:var(--red)">ขาด ${empAbsent}วัน</span>`:''}
           ${empLeave>0?`<span class="stat-pill" style="background:var(--blue-light);color:var(--blue)">ลา ${empLeave}วัน</span>`:''}
           ${empUnscheduled>0?`<span class="stat-pill" style="background:#FFF8E1;color:#8A4B00">รอตั้งตาราง ${empUnscheduled}วัน</span>`:''}
+          ${empPendingSwap>0?`<span class="stat-pill" style="background:#FFF8E1;color:#8A4B00">รออนุมัติสลับวันหยุด ${empPendingSwap}วัน</span>`:''}
           ${empOT>0?`<span class="stat-pill" style="background:#EDE7F6;color:#4527A0">OT ${empOT.toFixed(1)}ชม.</span>`:''}
         </div>
       </div>
@@ -496,8 +518,9 @@ function exportExcel(){
     const absentDays=rows.filter(r=>r.สถานะ==='ขาด').length;
     const leaveDays=rows.filter(r=>r.สถานะ==='ลา').length;
     const unscheduledDays=rows.filter(r=>r.สถานะ==='รอตั้งตาราง').length;
+    const pendingSwapDays=rows.filter(r=>r.สถานะ==='รออนุมัติสลับวันหยุด').length;
     const otHrs=rows.reduce((s,r)=>s+parseFloat(r.OT_ชม||0),0);
-    const qualified=lateDays===0&&absentDays===0&&leaveDays===0&&unscheduledDays===0;
+    const qualified=lateDays===0&&absentDays===0&&leaveDays===0&&unscheduledDays===0&&pendingSwapDays===0;
     summary.push({
       ชื่อ:name,
       แผนก:rows[0]?.แผนก||'',
@@ -508,12 +531,13 @@ function exportExcel(){
       ขาด_วัน:absentDays,
       ลา_วัน:leaveDays,
       รอตั้งตาราง_วัน:unscheduledDays,
+      รออนุมัติสลับวันหยุด_วัน:pendingSwapDays,
       OT_ชม:otHrs.toFixed(1),
       เบี้ยขยัน:qualified?'ได้':'ไม่ได้'
     });
   });
   const wsSummary=XLSX.utils.json_to_sheet(summary);
-  wsSummary['!cols']=[{wch:18},{wch:12},{wch:16},{wch:12},{wch:10},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10}];
+  wsSummary['!cols']=[{wch:18},{wch:12},{wch:16},{wch:12},{wch:10},{wch:14},{wch:10},{wch:10},{wch:14},{wch:20},{wch:10},{wch:10}];
   // Style header row
   XLSX.utils.book_append_sheet(wb,wsSummary,'สรุปทุกคน');
 

@@ -345,7 +345,7 @@ const dateStr=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
 const ADVANCE_AMOUNT=4000; // รอบ 1 จ่ายคงที่
 
-let allEmps=[],salaryConfigs=[],payrollRuns=[],allWorkPatterns=[],paymentTracking=[],currentUser=null,isOwner=false,currentRunItems=[],selectedPayrollItem=null,selectedPayrollRun=null;
+let allEmps=[],salaryConfigs=[],payrollRuns=[],allWorkPatterns=[],allDayOffSwaps=[],paymentTracking=[],currentUser=null,isOwner=false,currentRunItems=[],selectedPayrollItem=null,selectedPayrollRun=null;
 
 function fmt(n){if(!n&&n!==0)return'–';return Number(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtD(d){if(!d)return'–';const dt=new Date(d+'T00:00:00');return dt.getDate()+' '+MONTHS[dt.getMonth()]+' '+(dt.getFullYear()+543);}
@@ -378,6 +378,16 @@ function workPatternForDate(patterns,employeeId,date){
   return(patterns||[])
     .filter(p=>p.employee_id===employeeId&&p.effective_from<=date&&(!p.effective_to||p.effective_to>=date))
     .sort((a,b)=>b.effective_from.localeCompare(a.effective_from))[0]||null;
+}
+function dayOffSwapForDate(swaps,employeeId,date,statuses=['approved']){
+  return(swaps||[]).find(s=>s.employee_id===employeeId&&statuses.includes(s.status)
+    &&(s.replacement_off_date===date||s.replacement_work_date===date))||null;
+}
+function isScheduledWorkDate(pattern,swaps,employeeId,date){
+  const swap=dayOffSwapForDate(swaps,employeeId,date,['approved']);
+  if(swap?.replacement_off_date===date)return false;
+  if(swap?.replacement_work_date===date)return true;
+  return!!pattern&&!pattern.weekly_off_days.includes(new Date(date+'T00:00:00').getDay());
 }
 
 async function doLogin(){
@@ -443,20 +453,22 @@ async function loadMainData(){
   document.getElementById('adv-date').value=dateStr(now);
   document.getElementById('hdr-period').textContent=thaiM(ym);
 
-  const[employeeResult,salaryResult,runResult,patternResult,paymentResult]=await Promise.all([
+  const[employeeResult,salaryResult,runResult,patternResult,swapResult,paymentResult]=await Promise.all([
     db.from('employees').select('*').order('name'),
     // RLS จะ filter ให้อัตโนมัติ: owner เห็นทุกคน, คนอื่นเห็นแค่ตัวเอง
     db.from('employee_salary').select('*'),
     db.from('payroll_runs').select('*').order('pay_date',{ascending:false}),
     db.from('employee_work_patterns').select('*').order('effective_from',{ascending:false}),
+    db.from('employee_day_off_swaps').select('*').in('status',['pending','approved']).order('payroll_month',{ascending:false}),
     db.from('payroll_items').select('id,payroll_run_id,payment_status,paid_amount,advance_principal_paid')
   ]);
-  const loadError=employeeResult.error||salaryResult.error||runResult.error||patternResult.error||paymentResult.error;
+  const loadError=employeeResult.error||salaryResult.error||runResult.error||patternResult.error||swapResult.error||paymentResult.error;
   if(loadError){alert('โหลดข้อมูล Payroll ไม่สำเร็จ: '+loadError.message);return;}
   allEmps=employeeResult.data||[];
   salaryConfigs=salaryResult.data||[];
   payrollRuns=runResult.data||[];
   allWorkPatterns=patternResult.data||[];
+  allDayOffSwaps=swapResult.data||[];
   paymentTracking=paymentResult.data||[];
 
   const advSel=document.getElementById('adv-emp');
@@ -527,7 +539,7 @@ async function loadSummary(){
   }).join('');
 
   if(isOwner){
-    document.getElementById('sg-emp').textContent=allEmps.length;
+    document.getElementById('sg-emp').textContent=visibleEmps.length;
     document.getElementById('sg-gross').textContent='฿'+fmt(totalGross);
     document.getElementById('sg-net').textContent='฿'+fmt(totalNet);
     document.getElementById('sg-ss').textContent='฿'+fmt(totalDed);
@@ -841,8 +853,14 @@ function hasScheduleForPeriod(employee,start,end){
   return true;
 }
 
+async function refreshDayOffSwaps(){
+  const{data,error}=await db.from('employee_day_off_swaps').select('*').in('status',['pending','approved']).order('payroll_month',{ascending:false});
+  if(error)throw new Error('โหลดรายการสลับวันหยุดไม่ได้: '+error.message);
+  allDayOffSwaps=data||[];
+}
+
 function getRunReadiness(run){
-  if(!run.year_month)return{ok:false,eligible:[],missingSalary:[],missingSchedule:[],message:'กรุณาเลือกเดือน'};
+  if(!run.year_month)return{ok:false,eligible:[],missingSalary:[],missingSchedule:[],pendingSwaps:[],message:'กรุณาเลือกเดือน'};
   const[y,m]=run.year_month.split('-');
   const start=`${y}-${m}-01`;
   const monthEnd=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
@@ -850,7 +868,8 @@ function getRunReadiness(run){
   const eligible=eligibleEmployeesForRun(run);
   const missingSalary=eligible.filter(emp=>!salaryConfigs.some(cfg=>cfg.employee_id===emp.id));
   const missingSchedule=run.run_type==='final'?eligible.filter(emp=>!hasScheduleForPeriod(emp,start,end)):[];
-  return{ok:eligible.length>0&&!missingSalary.length&&!missingSchedule.length,eligible,missingSalary,missingSchedule};
+  const pendingSwaps=run.run_type==='final'?allDayOffSwaps.filter(s=>s.payroll_month===`${run.year_month}-01`&&s.status==='pending'):[];
+  return{ok:eligible.length>0&&!missingSalary.length&&!missingSchedule.length&&!pendingSwaps.length,eligible,missingSalary,missingSchedule,pendingSwaps};
 }
 
 function renderRunReadiness(){
@@ -869,6 +888,7 @@ function renderRunReadiness(){
   if(!readiness.eligible.length)problems.push('ไม่พบพนักงานที่อยู่ในรอบจ่าย');
   if(readiness.missingSalary.length)problems.push(`ยังไม่ตั้งค่าเงินเดือน ${readiness.missingSalary.length} คน: ${readiness.missingSalary.map(e=>e.name).join(', ')}`);
   if(readiness.missingSchedule.length)problems.push(`ตารางวันทำงานไม่ครอบคลุมรอบจ่าย ${readiness.missingSchedule.length} คน: ${readiness.missingSchedule.map(e=>e.name).join(', ')}`);
+  if(readiness.pendingSwaps.length)problems.push(`มีรายการสลับวันหยุดรออนุมัติ ${readiness.pendingSwaps.length} รายการ — กลับไปหน้าลงเวลา > จัดการ > สลับวันหยุดรายเดือน`);
   if(problems.length){
     const list=document.createElement('ul');
     problems.forEach(message=>{const item=document.createElement('li');item.textContent=message;list.appendChild(item);});
@@ -905,6 +925,7 @@ async function createRun(){
   const ot_start=document.getElementById('run-ot-start').value||null;
   const ot_end=document.getElementById('run-ot-end').value||null;
   if(!ym||!pay_date){alert('กรุณากรอกข้อมูลให้ครบ');return;}
+  try{await refreshDayOffSwaps();}catch(error){alert(error.message);return;}
   const readiness=getRunReadiness({year_month:ym,run_type,pay_date});
   if(!readiness.ok){renderRunReadiness();alert('ยังสร้างรอบจ่ายไม่ได้ กรุณาแก้ข้อมูลที่ระบบแจ้งก่อน');return;}
 
@@ -945,15 +966,17 @@ async function calcAndSaveItems(run,employees=null){
       .in('payroll_runs.status',['confirmed','paid'])
       .eq('payment_status','paid')
     :Promise.resolve({data:[],error:null});
-  const[{data:atts,error:attendanceError},{data:leaves,error:leaveError},{data:workPatterns,error:patternError},{data:advancePayments,error:advancePaymentError}]=await Promise.all([
+  const[{data:atts,error:attendanceError},{data:leaves,error:leaveError},{data:workPatterns,error:patternError},{data:approvedSwaps,error:swapError},{data:advancePayments,error:advancePaymentError}]=await Promise.all([
     db.from('attendance').select('*').gte('work_date',start).lte('work_date',end),
     db.from('leave_requests').select('*').eq('status','approved').lte('start_date',end).gte('end_date',start),
     db.from('employee_work_patterns').select('*').lte('effective_from',end),
+    db.from('employee_day_off_swaps').select('*').eq('payroll_month',`${run.year_month}-01`).eq('status','approved'),
     advancePaymentQuery
   ]);
   if(attendanceError)throw attendanceError;
   if(leaveError)throw leaveError;
   if(patternError)throw patternError;
+  if(swapError)throw swapError;
   if(advancePaymentError)throw advancePaymentError;
 
   const items=targetEmployees.map(emp=>{
@@ -991,7 +1014,7 @@ async function calcAndSaveItems(run,employees=null){
       const workDate=dateStr(day);
       if(emp.attendance_required!==false&&employeeEligibleForPeriod(emp,workDate,workDate)){
         const pattern=workPatternForDate(workPatterns,emp.id,workDate);
-        if(pattern&&!pattern.weekly_off_days.includes(day.getDay())){
+        if(isScheduledWorkDate(pattern,approvedSwaps,emp.id,workDate)){
           scheduledDays++;
           const hasAttendance=empAtts.some(a=>a.work_date===workDate);
           const hasApprovedLeave=(leaves||[]).some(l=>l.employee_id===emp.id&&l.start_date<=workDate&&l.end_date>=workDate);
@@ -1032,8 +1055,9 @@ async function deleteRun(id){
 async function recalcRun(id){
   if(!confirm('คำนวณใหม่? ข้อมูลเดิมในรอบนี้จะถูกลบแล้วคำนวณใหม่จากข้อมูลปัจจุบัน'))return;
   const run=payrollRuns.find(r=>r.id===id);if(!run)return;
+  try{await refreshDayOffSwaps();}catch(error){alert(error.message);return;}
   const readiness=getRunReadiness(run);
-  if(!readiness.ok){alert('คำนวณใหม่ไม่ได้ กรุณาแก้ข้อมูลเงินเดือนและตารางวันทำงานให้ครบก่อน');return;}
+  if(!readiness.ok){alert('คำนวณใหม่ไม่ได้ กรุณาแก้ข้อมูลเงินเดือน ตารางวันทำงาน และอนุมัติรายการสลับวันหยุดให้ครบก่อน');return;}
   const{data:backupItems,error:backupError}=await db.from('payroll_items').select('*').eq('payroll_run_id',id);
   if(backupError){alert('สำรองรายการเดิมก่อนคำนวณไม่สำเร็จ: '+backupError.message);return;}
   const{error}=await db.from('payroll_items').delete().eq('payroll_run_id',id);
@@ -1051,8 +1075,9 @@ async function recalcRun(id){
 
 async function confirmRun(id){
   const run=payrollRuns.find(r=>r.id===id);if(!run||run.status!=='draft')return;
+  try{await refreshDayOffSwaps();}catch(error){alert(error.message);return;}
   const readiness=getRunReadiness(run);
-  if(!readiness.ok){alert('ยังยืนยันรอบไม่ได้ กรุณาแก้ข้อมูลเงินเดือนและตารางวันทำงานให้ครบก่อน');return;}
+  if(!readiness.ok){alert('ยังยืนยันรอบไม่ได้ กรุณาแก้ข้อมูลเงินเดือน ตารางวันทำงาน และอนุมัติรายการสลับวันหยุดให้ครบก่อน');return;}
   const{data:items,error:itemError}=await db.from('payroll_items').select('employee_id').eq('payroll_run_id',id);
   if(itemError){alert('ตรวจรายการพนักงานไม่ได้: '+itemError.message);return;}
   const expectedIds=new Set(readiness.eligible.map(emp=>emp.id));
