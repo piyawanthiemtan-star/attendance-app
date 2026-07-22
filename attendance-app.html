@@ -569,7 +569,12 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
           <div class="admin-item-info"><div class="admin-item-label">รายงานเวลาทำงาน</div><div class="admin-item-sub">ดูและ Export Excel รายบุคคล</div></div>
           <div class="admin-item-arrow">›</div>
         </a>
-        <a class="admin-item" href="payroll.html" style="text-decoration:none;color:inherit">
+        <button class="admin-item" id="admin-attendance-request-btn" type="button" onclick="openAttendanceRequests()">
+          <div class="admin-item-icon" style="background:#FFF8E1;font-size:22px">🕐</div>
+          <div class="admin-item-info"><div class="admin-item-label">อนุมัติแก้ไขเวลา</div><div class="admin-item-sub" id="attendance-request-sub">ไม่มีคำขอรออนุมัติ</div></div>
+          <div class="admin-item-arrow">›</div>
+        </button>
+        <a class="admin-item" id="admin-payroll-link" href="payroll.html" style="text-decoration:none;color:inherit">
           <div class="admin-item-icon" style="background:transparent;padding:0"><img src="assets/icons/payroll/icon-512-payroll.png" style="width:42px;height:42px;border-radius:10px;object-fit:contain"></div>
           <div class="admin-item-info"><div class="admin-item-label">ระบบเงินเดือน</div><div class="admin-item-sub">คำนวณ สลิป รอบจ่าย เบิกล่วงหน้า</div></div>
           <div class="admin-item-arrow">›</div>
@@ -856,7 +861,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
     <label class="modal-label" for="empf-schedule-effective">เริ่มใช้ตั้งแต่วันที่ *</label>
     <input class="modal-input" type="date" id="empf-schedule-effective">
     <div class="schedule-helper" id="empf-schedule-status">วันที่เลือกเป็นวันหยุด ระบบจะไม่นับว่าเป็นวันขาดงาน สามารถกำหนดต่างกันรายพนักงานได้</div>
-    <label class="modal-label">บทบาท *</label>
+    <label class="modal-label" id="empf-role-label">บทบาท *</label>
     <select class="modal-select" id="empf-role" onchange="updateRoleHint()">
       <option value="employee">👤 พนักงาน</option>
       <option value="hr">👩‍💼 HR</option>
@@ -897,9 +902,9 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
   <div class="modal-box">
     <div class="modal-handle"></div>
     <div class="modal-title"><span id="edit-att-title">✏️ แก้ไขเวลาเข้า-ออก</span> <button class="modal-close" onclick="closeModal('modal-edit-att')">✕</button></div>
-    <div style="background:#FFF8E1;border:1px solid #F57F17;border-radius:8px;padding:10px 12px;margin-bottom:12px">
-      <div style="font-size:12px;font-weight:700;color:#E65100">👑 สิทธิ์เจ้าของกิจการเท่านั้น</div>
-      <div style="font-size:11px;color:#E65100;margin-top:2px">การแก้ไขจะถูกบันทึกลงระบบทันที</div>
+    <div id="edit-att-access-note" style="background:#FFF8E1;border:1px solid #F57F17;border-radius:8px;padding:10px 12px;margin-bottom:12px">
+      <div id="edit-att-access-title" style="font-size:12px;font-weight:700;color:#E65100">👑 Owner แก้ไขและยืนยันได้ทันที</div>
+      <div id="edit-att-access-sub" style="font-size:11px;color:#E65100;margin-top:2px">HR ส่งคำขอได้ โดยเวลาจริงจะเปลี่ยนหลัง Owner อนุมัติเท่านั้น</div>
     </div>
     <input type="hidden" id="edit-att-id">
     <input type="hidden" id="edit-att-employee-id">
@@ -913,7 +918,16 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
     <input class="modal-input" id="edit-att-checkout" placeholder="18:00" maxlength="5" inputmode="numeric">
     <label class="modal-label">เหตุผลที่แก้ไข *</label>
     <textarea class="modal-textarea" id="edit-att-note" placeholder="ระบุเหตุผลที่แก้ไข..."></textarea>
-    <button class="btn-primary" onclick="saveEditAttendance()">💾 บันทึกการแก้ไข</button>
+    <button class="btn-primary" id="edit-att-save-btn" onclick="saveEditAttendance()">💾 บันทึกการแก้ไข</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-attendance-requests">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="attendance-request-title">
+    <div class="modal-handle"></div>
+    <div class="modal-title"><span id="attendance-request-title">คำขอแก้ไขเวลา</span><button class="modal-close" type="button" onclick="closeModal('modal-attendance-requests')" aria-label="ปิด">✕</button></div>
+    <div id="attendance-request-list"><div class="loading-text">กำลังโหลด...</div></div>
+    <button class="btn-secondary" type="button" onclick="closeModal('modal-attendance-requests')" style="margin-top:10px">ปิด</button>
   </div>
 </div>
 
@@ -1137,6 +1151,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       <input class="modal-input" type="date" id="swap-work-date">
       <label class="modal-label" for="swap-reason">เหตุผล</label>
       <textarea class="modal-textarea" id="swap-reason" maxlength="500" placeholder="เช่น มีธุระวันพุธ จึงมาทำงานชดเชยวันพฤหัส"></textarea>
+      <div class="schedule-helper" id="swap-role-helper">HR บันทึกรออนุมัติ และ Owner เป็นผู้อนุมัติขั้นสุดท้าย</div>
       <div class="schedule-helper">วันที่หยุดใหม่ต้องเป็นวันทำงานเดิม และวันทำงานชดเชยต้องเป็นวันหยุดประจำของพนักงาน ทั้งสองวันต้องอยู่ในเดือนเดียวกัน</div>
       <button class="btn-primary" type="button" id="btn-save-swap">บันทึกรออนุมัติ</button>
     </div>
@@ -1170,7 +1185,7 @@ const{createClient}=supabase;
 const db=createClient(SB_URL,SB_KEY);
 
 let user=null,todayAtt=null,selLeaveId=null,selLeaveType='sick';
-let allEmps=[],allShifts=[],allBranches=[],bonusCfg=null,employeeWorkPatterns=[],employeeDayOffSwaps=[];
+let allEmps=[],allShifts=[],allBranches=[],bonusCfg=null,employeeWorkPatterns=[],employeeDayOffSwaps=[],attendanceChangeRequests=[];
 let clockTick=null,gpsCached=null;
 let loginAuthType='pin';
 let pinSessionSecret='';
@@ -1401,8 +1416,10 @@ async function initApp(){
   document.getElementById('leave-from').value=todayStr();
   document.getElementById('leave-to').value=todayStr();
   loadTodayAtt();loadHome();loadLeave();loadBonus();
-  if(user.role==='hr'||user.role==='owner'){loadAdminSummary();loadApproveCount();loadAlertCount();}
-  if(user.role==='owner')loadDayOffSwapPendingCount();
+  if(user.role==='hr'||user.role==='owner'){
+    loadAdminSummary();loadApproveCount();loadAlertCount();
+    loadDayOffSwapPendingCount();loadAttendanceChangeCount();
+  }
   checkGPS();
   applyRoleAccess();
 }
@@ -1446,8 +1463,13 @@ function applyRoleAccess() {
   user._canSeeAllReports = (role === 'owner' || role === 'hr');
   user._canApprove = (role === 'owner' || role === 'hr');
   user._canManageEmp = (role === 'owner' || role === 'hr');
+  const isManagement=role==='owner'||role==='hr';
   const swapAdminButton=document.getElementById('admin-day-off-swap-btn');
-  if(swapAdminButton)swapAdminButton.style.display=role==='owner'?'flex':'none';
+  if(swapAdminButton)swapAdminButton.style.display=isManagement?'flex':'none';
+  const attendanceRequestButton=document.getElementById('admin-attendance-request-btn');
+  if(attendanceRequestButton)attendanceRequestButton.style.display=isManagement?'flex':'none';
+  const payrollAdminLink=document.getElementById('admin-payroll-link');
+  if(payrollAdminLink)payrollAdminLink.style.display=role==='owner'?'flex':'none';
   
   // Update role badge
   const badge = document.getElementById('role-badge');
@@ -1966,18 +1988,20 @@ async function loadReport(){
     {data:atts},
     {data:leaves},
     {data:workPatterns,error:workPatternError},
-    {data:dayOffSwaps,error:dayOffSwapError}
+    {data:dayOffSwaps,error:dayOffSwapError},
+    {data:pendingAttendanceChanges,error:attendanceChangeError}
   ]=await Promise.all([
     db.from('employees').select('*').order('name'),
     db.from('attendance').select('*').eq('work_date',date),
     db.from('leave_requests').select('*').eq('status','approved').lte('start_date',date).gte('end_date',date),
     db.from('employee_work_patterns').select('*').lte('effective_from',date),
-    db.from('employee_day_off_swaps').select('*').eq('payroll_month',payrollMonth).in('status',['pending','approved'])
+    db.from('employee_day_off_swaps').select('*').eq('payroll_month',payrollMonth).in('status',['pending','approved']),
+    db.from('attendance_change_requests').select('*').eq('work_date',date).eq('status','pending')
   ]);
   const emps=(employeeRows||[]).filter(employee=>employeeInServiceOnDate(employee,date)
     &&(employee.payroll_eligible!==false||employee.attendance_required!==false));
-  if(workPatternError||dayOffSwapError){
-    document.getElementById('report-content').innerHTML='<div class="loading-text" style="color:var(--red)">โหลดตารางวันหยุดไม่ได้</div>';
+  if(workPatternError||dayOffSwapError||attendanceChangeError){
+    document.getElementById('report-content').innerHTML='<div class="loading-text" style="color:var(--red)">โหลดข้อมูลรายงานหรือรายการรออนุมัติไม่ได้</div>';
     return;
   }
   let present=0,late=0,onleave=0,absent=0,weeklyOff=0,unscheduled=0,pendingSchedule=0;
@@ -1990,6 +2014,7 @@ async function loadReport(){
     const schedule=scheduleStateForDate(pattern,dayOffSwaps,e.id,date);
     const isWeeklyOff=schedule.isOff;
     const pendingSwap=dayOffSwapForDate(dayOffSwaps,e.id,date,['pending']);
+    const pendingAttendanceChange=(pendingAttendanceChanges||[]).find(request=>request.employee_id===e.id);
     const shift=allShifts.find(x=>x.id===(a?.shift_id||e.shift_id));
     const br=allBranches.find(x=>x.id===a?.branch_id);
     let badge='ยังไม่มา',badgeCls='badge-absent',sub='--';
@@ -2003,6 +2028,7 @@ async function loadReport(){
       if(schedule.swap?.replacement_off_date===date)sub+=' · ทำงานในวันหยุดสลับ';
       else if(isWeeklyOff)sub+=' · ทำงานในวันหยุดประจำสัปดาห์';
       if(pendingSwap)sub+=' · รออนุมัติสลับวันหยุด';
+      if(pendingAttendanceChange)sub+=' · รอ Owner อนุมัติแก้เวลา';
     }else if(e.attendance_required===false){
       badge='ยกเว้นลงเวลา';badgeCls='badge-leave';sub='ไม่บังคับตารางและไม่ถูกนับขาดงาน';
     }else if(l){
@@ -2017,15 +2043,14 @@ async function loadReport(){
       absent++;
     }
     const[bg,tx]=AV[i%5];
-    const isOwner = user.role==='owner';
-    const canEdit = isOwner && e.attendance_required!==false;
+    const canEdit = ['owner','hr'].includes(user.role)&&e.attendance_required!==false&&!pendingAttendanceChange;
     const empNameSafe = encodeURIComponent(e.name);
     const clickAttr = canEdit
       ? `onclick="openEditAtt('${a?.id||''}','${e.id}','${empNameSafe}','${date}','${a?.check_in||''}','${a?.check_out||''}','${shift?.check_in_time?.substring(0,5)||''}','${shift?.check_out_time?.substring(0,5)||''}')" style="cursor:pointer"`
       : '';
-    const editIcon = canEdit
-      ? ` <span style="font-size:10px;color:var(--teal)">${a?.check_in?'✏️ แก้เวลา':'➕ เพิ่มเวลา'}</span>`
-      : '';
+    const editIcon = pendingAttendanceChange
+      ? ' <span style="font-size:10px;color:var(--orange)">⏳ รออนุมัติแก้เวลา</span>'
+      : canEdit?` <span style="font-size:10px;color:var(--teal)">${a?.check_in?'✏️ แก้เวลา':'➕ เพิ่มเวลา'}</span>`:'';
     const avatarHTML = e.photo_url
       ? '<img src="' + e.photo_url + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
       : e.name.substring(0,2);
@@ -2045,9 +2070,9 @@ async function loadReport(){
   </div>`+rows.join('');
 }
 
-// ========== EDIT ATTENDANCE (เจ้าของเท่านั้น) ==========
+// ========== EDIT ATTENDANCE (HR requests, Owner approves) ==========
 function openEditAtt(attId, employeeId, encodedEmpName, workDate, checkIn, checkOut, defaultCheckIn='', defaultCheckOut=''){
-  if(user.role!=='owner'){toast('❌ สิทธิ์เจ้าของกิจการเท่านั้น','#E53935');return;}
+  if(!['owner','hr'].includes(user.role)){toast('❌ สิทธิ์ HR หรือ Owner เท่านั้น','#E53935');return;}
   document.getElementById('edit-att-id').value = attId;
   document.getElementById('edit-att-employee-id').value = employeeId;
   document.getElementById('edit-att-title').textContent = attId?'✏️ แก้ไขเวลาเข้า-ออก':'➕ เพิ่มเวลาย้อนหลัง';
@@ -2057,13 +2082,17 @@ function openEditAtt(attId, employeeId, encodedEmpName, workDate, checkIn, check
   document.getElementById('edit-att-checkin').value = toHHMM(checkIn)||defaultCheckIn;
   document.getElementById('edit-att-checkout').value = toHHMM(checkOut)||defaultCheckOut;
   document.getElementById('edit-att-note').value = '';
+  const isHR=user.role==='hr';
+  document.getElementById('edit-att-access-title').textContent=isHR?'👩‍💼 HR ส่งคำขอแก้ไขเวลา':'👑 Owner ยืนยันการแก้ไขได้ทันที';
+  document.getElementById('edit-att-access-sub').textContent=isHR?'เวลาจริงจะยังไม่เปลี่ยน จนกว่า Owner จะอนุมัติขั้นสุดท้าย':'การแก้ไขโดย Owner จะบันทึกลงระบบทันที';
+  document.getElementById('edit-att-save-btn').textContent=isHR?'📨 ส่งให้ Owner อนุมัติ':'💾 บันทึกและยืนยัน';
   openModal('modal-edit-att');
 }
 
 async function invokeAttendanceAdmin(payload){
-  if(loginAuthType!=='supabase')throw new Error('กรุณาเข้าสู่ระบบด้วย Email ของ Owner ก่อน');
+  if(loginAuthType!=='supabase'||!['owner','hr'].includes(user?.role))throw new Error('กรุณาเข้าสู่ระบบด้วย Email ของ HR/Owner ก่อน');
   const{data,error}=await db.functions.invoke('attendance-admin',{
-    body:{action:'upsert_attendance',...payload}
+    body:payload
   });
   if(error){
     let message=data?.error||error.message||'ดำเนินการไม่สำเร็จ';
@@ -2075,7 +2104,7 @@ async function invokeAttendanceAdmin(payload){
 }
 
 async function saveEditAttendance(){
-  if(user.role!=='owner'){toast('❌ สิทธิ์เจ้าของกิจการเท่านั้น','#E53935');return;}
+  if(!['owner','hr'].includes(user.role)){toast('❌ สิทธิ์ HR หรือ Owner เท่านั้น','#E53935');return;}
   const attId = document.getElementById('edit-att-id').value;
   const employeeId = document.getElementById('edit-att-employee-id').value;
   const workDate = document.getElementById('edit-att-date').value;
@@ -2089,7 +2118,8 @@ async function saveEditAttendance(){
   if(checkoutStr&&!timeReg.test(checkoutStr)){toast('รูปแบบเวลาออกไม่ถูกต้อง (HH:MM)','#E53935');return;}
   if(checkoutStr&&checkoutStr<=checkinStr){toast('เวลาออกต้องมากกว่าเวลาเข้า','#E53935');return;}
   try{
-    await invokeAttendanceAdmin({
+    const result=await invokeAttendanceAdmin({
+      action:'upsert_attendance',
       attendance_id:attId||null,
       employee_id:employeeId,
       work_date:workDate,
@@ -2097,10 +2127,73 @@ async function saveEditAttendance(){
       check_out:checkoutStr||null,
       reason:note
     });
+    closeModal('modal-edit-att');
+    if(result.pending_approval){
+      toast('📨 ส่งคำขอแล้ว · รอ Owner อนุมัติ','#F57F17');
+    }else{
+      toast(attId?'✅ แก้ไขและยืนยันเวลาแล้ว':'✅ เพิ่มและยืนยันเวลาย้อนหลังแล้ว','#0B9E82');
+    }
   }catch(error){toast('บันทึกไม่ได้: '+error.message,'#E53935');return;}
-  closeModal('modal-edit-att');
-  toast(attId?'✅ แก้ไขเวลาเรียบร้อยแล้ว':'✅ เพิ่มเวลาย้อนหลังเรียบร้อยแล้ว','#0B9E82');
-  loadReport();
+  await loadReport();await loadAttendanceChangeCount();
+}
+
+async function loadAttendanceChangeCount(){
+  if(!user||!['owner','hr'].includes(user.role))return;
+  const{count,error}=await db.from('attendance_change_requests').select('id',{count:'exact',head:true}).eq('status','pending');
+  const sub=document.getElementById('attendance-request-sub');
+  if(!sub)return;
+  sub.textContent=error?'ตรวจคำขอแก้เวลาไม่ได้':count?`รอ Owner อนุมัติ ${count} รายการ`:'ไม่มีคำขอรออนุมัติ';
+}
+
+async function openAttendanceRequests(){
+  if(!user||!['owner','hr'].includes(user.role)){toast('เฉพาะ HR หรือ Owner เท่านั้น','#E53935');return;}
+  if(!allEmps.length){
+    const{data:employees}=await db.from('employees').select('*').order('name');
+    allEmps=employees||[];
+  }
+  const list=document.getElementById('attendance-request-list');
+  list.innerHTML='<div class="loading-text">กำลังโหลด...</div>';
+  document.getElementById('attendance-request-title').textContent=user.role==='owner'?'อนุมัติแก้ไขเวลา':'คำขอแก้ไขเวลาของฉัน';
+  openModal('modal-attendance-requests');
+  const{data,error}=await db.from('attendance_change_requests').select('*').order('created_at',{ascending:false}).limit(50);
+  if(error){list.innerHTML='<div class="loading-text" style="color:var(--red)">โหลดคำขอไม่ได้</div>';return;}
+  attendanceChangeRequests=data||[];
+  renderAttendanceRequests();
+}
+
+function renderAttendanceRequests(){
+  const list=document.getElementById('attendance-request-list');
+  if(!attendanceChangeRequests.length){
+    list.innerHTML='<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">ยังไม่มีคำขอแก้ไขเวลา</div></div>';
+    return;
+  }
+  const labels={pending:'รอ Owner อนุมัติ',approved:'อนุมัติแล้ว',rejected:'ไม่อนุมัติ',cancelled:'ยกเลิก'};
+  list.innerHTML=attendanceChangeRequests.map(request=>{
+    const employee=allEmps.find(e=>e.id===request.employee_id);
+    const requester=allEmps.find(e=>e.id===request.requested_by);
+    const actions=user.role==='owner'&&request.status==='pending'
+      ?`<div class="approve-btns"><button class="btn-secondary" type="button" onclick="reviewAttendanceRequest('${request.id}','rejected')">ไม่อนุมัติ</button><button class="btn-approve" type="button" onclick="reviewAttendanceRequest('${request.id}','approved')">อนุมัติ</button></div>`:'';
+    return`<div class="swap-card">
+      <div class="swap-card-head"><div class="swap-card-name">${escapeScheduleHtml(employee?.name||'ไม่พบชื่อพนักงาน')}</div><span class="swap-status ${request.status==='approved'?'approved':request.status==='pending'?'pending':'cancelled'}">${labels[request.status]||request.status}</span></div>
+      <div class="swap-meta">วันที่: <strong>${fmtDate(request.work_date)}</strong><br>เวลาที่เสนอ: <strong>${fmtT(request.proposed_check_in)} – ${request.proposed_check_out?fmtT(request.proposed_check_out):'ยังไม่ระบุ'}</strong><br>เหตุผล: ${escapeScheduleHtml(request.reason)}<br>ผู้เสนอ: ${escapeScheduleHtml(requester?.name||'HR')}</div>
+      ${request.review_note?`<div class="schedule-helper">หมายเหตุ Owner: ${escapeScheduleHtml(request.review_note)}</div>`:''}
+      ${actions}
+    </div>`;
+  }).join('');
+}
+
+async function reviewAttendanceRequest(id,decision){
+  if(user?.role!=='owner'){toast('สิทธิ์ Owner เท่านั้น','#E53935');return;}
+  let reviewNote='';
+  if(decision==='rejected'){
+    reviewNote=prompt('ระบุเหตุผลที่ไม่อนุมัติ (อย่างน้อย 3 ตัวอักษร)')||'';
+    if(reviewNote.trim().length<3)return;
+  }else if(!confirm('อนุมัติคำขอแก้ไขเวลานี้?\n\nรายงานและ Payroll จะใช้เวลาที่แก้ไขทันที'))return;
+  try{
+    await invokeAttendanceAdmin({action:'review_request',request_id:id,decision,review_note:reviewNote});
+    toast(decision==='approved'?'✅ อนุมัติและปรับเวลาแล้ว':'❌ ไม่อนุมัติคำขอ',decision==='approved'?'#0B9E82':'#E53935');
+    await openAttendanceRequests();await loadAttendanceChangeCount();await loadReport();
+  }catch(error){toast(error.message,'#E53935');}
 }
 
 async function loadMyAttHistory() {
@@ -2189,6 +2282,7 @@ async function loadBonusReport(){
 // ADMIN
 async function loadAdminSummary(){
   const{data:emps}=await db.from('employees').select('*');
+  allEmps=emps||[];
   const{data:atts}=await db.from('attendance').select('*').eq('work_date',todayStr());
   const el=document.getElementById('admin-today-summary');
   const requiredEmps=(emps||[]).filter(e=>e.attendance_required!==false&&e.payroll_eligible!==false&&employeeInServiceOnDate(e,todayStr()));
@@ -2331,7 +2425,8 @@ async function loadEmpList(){
   const{data}=await db.from('employees').select('*').order('name');
   allEmps=data||[];
   const el=document.getElementById('emp-list-admin');
-  el.innerHTML=allEmps.map((e,i)=>{
+  const manageableEmps=user.role==='hr'?allEmps.filter(e=>e.role==='employee'):allEmps;
+  el.innerHTML=manageableEmps.map((e,i)=>{
     const shift=allShifts.find(x=>x.id===e.shift_id);
     const br=allBranches.find(x=>x.id===e.branch_id);
     const[bg,tx]=AV[i%5];
@@ -2347,6 +2442,9 @@ async function openEmpForm(id){
   const sel2=document.getElementById('empf-branch');
   sel2.innerHTML='<option value="">-- เลือกสาขา --</option>';
   allBranches.forEach(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=b.name;sel2.appendChild(o);});
+  const roleSelect=document.getElementById('empf-role');
+  roleSelect.disabled=user.role!=='owner';
+  document.getElementById('empf-role-label').textContent=user.role==='owner'?'บทบาท *':'บทบาท · Owner เป็นผู้กำหนด';
   if(id){
     const e=allEmps.find(x=>x.id===id);if(!e)return;
     document.getElementById('empf-title').textContent='แก้ไขพนักงาน';
@@ -2426,7 +2524,7 @@ function updateRoleHint(){
   const r=document.getElementById('empf-role').value;
   const hints={
     employee:'👤 พนักงาน: ลงเวลา ขอลา ดูสลิป/รายงานของตัวเอง',
-    hr:'👩‍💼 HR: จัดการพนักงาน · รับทราบคำขอลา · นำเข้า Excel · ดูรายงานทุกคน (ไม่เห็นฐานเงินเดือน ไม่ลบสาขา/กะ)',
+    hr:'👩‍💼 HR: เพิ่มพนักงาน · ส่งคำขอแก้เวลา/สลับวันหยุด · ดูวันลาสะสม (ไม่เข้าระบบ Payroll)',
     owner:'👑 เจ้าของกิจการ: ทุกสิทธิ์ · อนุมัติลา · ตั้งค่า/ดูเงินเดือน · แก้เวลาย้อนหลัง'
   };
   document.getElementById('empf-role-hint').textContent=hints[r]||'';
@@ -2539,7 +2637,8 @@ async function saveEmp(){
   const bank_note=document.getElementById('empf-banknote').value.trim()||null;
   const pin=document.getElementById('empf-pin').value.trim();
   const branch_id=document.getElementById('empf-branch').value||null;
-  const role=document.getElementById('empf-role').value||'employee';
+  const existingEmployee=id?allEmps.find(e=>e.id===id):null;
+  const role=user.role==='owner'?(document.getElementById('empf-role').value||'employee'):(existingEmployee?.role||'employee');
   if(!name||!phone||!pin){toast('กรุณากรอกชื่อ เบอร์โทร และ PIN','#E53935');return;}
   if(pin.length!==4||isNaN(pin)){toast('PIN ต้องเป็นตัวเลข 4 หลัก','#E53935');return;}
   let error, savedId = id;
@@ -2653,7 +2752,7 @@ async function cleanupResigned(){
   toast(`🗑 ลบข้อมูลพนักงานลาออกครบ 30 วัน (${old.length} คน)`,'#E53935');
 }
 
-// MONTHLY DAY-OFF SWAPS (OWNER ONLY)
+// MONTHLY DAY-OFF SWAPS (HR records, Owner approves)
 function swapMonthBounds(month){
   const[y,m]=month.split('-').map(Number);
   return{start:`${month}-01`,end:`${month}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`};
@@ -2671,7 +2770,7 @@ function syncSwapDateBounds(){
 }
 
 async function invokeScheduleAdmin(payload){
-  if(loginAuthType!=='supabase'||user?.role!=='owner')throw new Error('กรุณาเข้าสู่ระบบด้วย Email ของ Owner ก่อน');
+  if(loginAuthType!=='supabase'||!['owner','hr'].includes(user?.role))throw new Error('กรุณาเข้าสู่ระบบด้วย Email ของ HR/Owner ก่อน');
   const{data,error}=await db.functions.invoke('schedule-admin',{body:payload});
   if(error){
     let message=data?.error||error.message||'ดำเนินการไม่สำเร็จ';
@@ -2683,8 +2782,8 @@ async function invokeScheduleAdmin(payload){
 }
 
 async function openDayOffSwapModal(){
-  if(user?.role!=='owner'){toast('สิทธิ์ Owner เท่านั้น','#E53935');return;}
-  if(loginAuthType!=='supabase'){toast('กรุณาเข้าสู่ระบบด้วย Email ของ Owner','#E53935');return;}
+  if(!['owner','hr'].includes(user?.role)){toast('สิทธิ์ HR หรือ Owner เท่านั้น','#E53935');return;}
+  if(loginAuthType!=='supabase'){toast('กรุณาเข้าสู่ระบบด้วย Email ของ HR/Owner','#E53935');return;}
   if(!allEmps.length){
     const{data,error}=await db.from('employees').select('*').order('name');
     if(error){toast('โหลดพนักงานไม่ได้: '+error.message,'#E53935');return;}
@@ -2697,6 +2796,11 @@ async function openDayOffSwapModal(){
   });
   const month=document.getElementById('swap-month');
   if(!month.value)month.value=monthStr();
+  const approveButton=document.getElementById('btn-approve-swap-month');
+  approveButton.style.display=user.role==='owner'?'block':'none';
+  document.getElementById('swap-role-helper').textContent=user.role==='owner'
+    ?'Owner บันทึกรายการและอนุมัติขั้นสุดท้ายก่อนทำ Payroll'
+    :'HR บันทึกรออนุมัติ · รายงานและ Payroll จะยังไม่ใช้จนกว่า Owner อนุมัติ';
   syncSwapDateBounds();
   openModal('modal-day-off-swaps');
   await loadDayOffSwaps();
@@ -2731,7 +2835,7 @@ function renderDayOffSwaps(){
     return`<div class="swap-card">
       <div class="swap-card-head"><div class="swap-card-name">${escapeScheduleHtml(employee?.name||'ไม่พบชื่อพนักงาน')}</div><span class="swap-status ${s.status}">${labels[s.status]||s.status}</span></div>
       <div class="swap-meta">หยุดใหม่: <strong>${escapeScheduleHtml(fmtDate(s.replacement_off_date))}</strong><br>มาทำงานชดเชย: <strong>${escapeScheduleHtml(fmtDate(s.replacement_work_date))}</strong><br>เหตุผล: ${escapeScheduleHtml(s.reason)}</div>
-      ${s.status==='pending'?`<div class="swap-actions"><button type="button" data-cancel-swap="${s.id}">ยกเลิกรายการ</button></div>`:''}
+      ${s.status==='pending'&&(user.role==='owner'||s.created_by===user.id)?`<div class="swap-actions"><button type="button" data-cancel-swap="${s.id}">ยกเลิกรายการ</button></div>`:''}
     </div>`;
   }).join('');
 }
@@ -2758,6 +2862,7 @@ async function saveDayOffSwap(){
 }
 
 async function approveSwapMonth(){
+  if(user?.role!=='owner'){toast('เฉพาะ Owner เท่านั้นที่อนุมัติขั้นสุดท้ายได้','#E53935');return;}
   const month=document.getElementById('swap-month').value;
   const pending=employeeDayOffSwaps.filter(s=>s.status==='pending').length;
   if(!pending)return;
@@ -2781,7 +2886,7 @@ async function cancelDayOffSwap(id){
 }
 
 async function loadDayOffSwapPendingCount(){
-  if(user?.role!=='owner')return;
+  if(!['owner','hr'].includes(user?.role))return;
   const{count,error}=await db.from('employee_day_off_swaps').select('id',{count:'exact',head:true}).eq('status','pending');
   const sub=document.getElementById('swap-pending-sub');
   if(!sub)return;
@@ -3800,6 +3905,7 @@ document.getElementById('modal-shift-form').addEventListener('click',function(e)
 document.getElementById('modal-import').addEventListener('click',function(e){if(e.target===this)closeModal('modal-import');});
 document.getElementById('modal-device-alerts').addEventListener('click',function(e){if(e.target===this)closeModal('modal-device-alerts');});
 document.getElementById('modal-day-off-swaps').addEventListener('click',function(e){if(e.target===this)closeModal('modal-day-off-swaps');});
+document.getElementById('modal-attendance-requests').addEventListener('click',function(e){if(e.target===this)closeModal('modal-attendance-requests');});
 document.getElementById('admin-day-off-swap-btn').addEventListener('click',openDayOffSwapModal);
 document.getElementById('swap-close-btn').addEventListener('click',()=>closeModal('modal-day-off-swaps'));
 document.getElementById('swap-close-bottom-btn').addEventListener('click',()=>closeModal('modal-day-off-swaps'));
@@ -3966,7 +4072,7 @@ async function loadMyPayslip(){
 </script>
 <script>
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=15').catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=16').catch(()=>{});
 }
 </script>
 </body>
