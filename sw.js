@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lsg-attendance-v15';
+const CACHE_NAME = 'lsg-attendance-v16';
 const ASSETS = [
   './index.html',
   './attendance-app.html',
