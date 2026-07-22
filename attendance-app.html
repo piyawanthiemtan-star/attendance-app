@@ -2084,12 +2084,15 @@ async function loadReport(){
     }
     const[bg,tx]=AV[i%5];
     const canEdit = ['owner','hr'].includes(user.role)&&e.attendance_required!==false&&!pendingAttendanceChange;
+    const canReviewPending = user.role==='owner'&&pendingAttendanceChange;
     const empNameSafe = encodeURIComponent(e.name);
-    const clickAttr = canEdit
-      ? `onclick="openEditAtt('${a?.id||''}','${e.id}','${empNameSafe}','${date}','${a?.check_in||''}','${a?.check_out||''}','${shift?.check_in_time?.substring(0,5)||''}','${shift?.check_out_time?.substring(0,5)||''}')" style="cursor:pointer"`
-      : '';
+    const clickAttr = canReviewPending
+      ? `onclick="openAttendanceRequests('${pendingAttendanceChange.id}')" style="cursor:pointer"`
+      : canEdit
+        ? `onclick="openEditAtt('${a?.id||''}','${e.id}','${empNameSafe}','${date}','${a?.check_in||''}','${a?.check_out||''}','${shift?.check_in_time?.substring(0,5)||''}','${shift?.check_out_time?.substring(0,5)||''}')" style="cursor:pointer"`
+        : '';
     const editIcon = pendingAttendanceChange
-      ? ' <span style="font-size:10px;color:var(--orange)">⏳ รออนุมัติแก้เวลา</span>'
+      ? ` <span style="font-size:10px;color:var(--orange)">${canReviewPending?'⏳ เปิดคำขอแก้เวลา':'⏳ รอ Owner อนุมัติแก้เวลา'}</span>`
       : canEdit?` <span style="font-size:10px;color:var(--teal)">${a?.check_in?'✏️ แก้เวลา':'➕ เพิ่มเวลา'}</span>`:'';
     const avatarHTML = e.photo_url
       ? '<img src="' + e.photo_url + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
@@ -2185,7 +2188,7 @@ async function loadAttendanceChangeCount(){
   sub.textContent=error?'ตรวจคำขอแก้เวลาไม่ได้':count?`รอ Owner อนุมัติ ${count} รายการ`:'ไม่มีคำขอรออนุมัติ';
 }
 
-async function openAttendanceRequests(){
+async function openAttendanceRequests(focusRequestId=''){
   if(!user||!['owner','hr'].includes(user.role)){toast('เฉพาะ HR หรือ Owner เท่านั้น','#E53935');return;}
   if(!allEmps.length){
     const{data:employees}=await db.from('employees').select('*').order('name');
@@ -2198,10 +2201,13 @@ async function openAttendanceRequests(){
   const{data,error}=await db.from('attendance_change_requests').select('*').order('created_at',{ascending:false}).limit(50);
   if(error){list.innerHTML='<div class="loading-text" style="color:var(--red)">โหลดคำขอไม่ได้</div>';return;}
   attendanceChangeRequests=data||[];
-  renderAttendanceRequests();
+  if(focusRequestId){
+    attendanceChangeRequests.sort((a,b)=>Number(b.id===focusRequestId)-Number(a.id===focusRequestId));
+  }
+  renderAttendanceRequests(focusRequestId);
 }
 
-function renderAttendanceRequests(){
+function renderAttendanceRequests(focusRequestId=''){
   const list=document.getElementById('attendance-request-list');
   if(!attendanceChangeRequests.length){
     list.innerHTML='<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">ยังไม่มีคำขอแก้ไขเวลา</div></div>';
@@ -2213,7 +2219,8 @@ function renderAttendanceRequests(){
     const requester=allEmps.find(e=>e.id===request.requested_by);
     const actions=user.role==='owner'&&request.status==='pending'
       ?`<div class="approve-btns"><button class="btn-secondary" type="button" onclick="reviewAttendanceRequest('${request.id}','rejected')">ไม่อนุมัติ</button><button class="btn-approve" type="button" onclick="reviewAttendanceRequest('${request.id}','approved')">อนุมัติ</button></div>`:'';
-    return`<div class="swap-card">
+    const focusStyle=request.id===focusRequestId?'border:2px solid var(--orange);background:#FFF8E8;':'';
+    return`<div class="swap-card" style="${focusStyle}">
       <div class="swap-card-head"><div class="swap-card-name">${escapeScheduleHtml(employee?.name||'ไม่พบชื่อพนักงาน')}</div><span class="swap-status ${request.status==='approved'?'approved':request.status==='pending'?'pending':'cancelled'}">${labels[request.status]||request.status}</span></div>
       <div class="swap-meta">วันที่: <strong>${fmtDate(request.work_date)}</strong><br>เวลาที่เสนอ: <strong>${fmtT(request.proposed_check_in)} – ${request.proposed_check_out?fmtT(request.proposed_check_out):'ยังไม่ระบุ'}</strong><br>เหตุผล: ${escapeScheduleHtml(request.reason)}<br>ผู้เสนอ: ${escapeScheduleHtml(requester?.name||'HR')}</div>
       ${request.review_note?`<div class="schedule-helper">หมายเหตุ Owner: ${escapeScheduleHtml(request.review_note)}</div>`:''}
@@ -4131,7 +4138,7 @@ async function loadMyPayslip(){
 </script>
 <script>
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=17').catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=18').catch(()=>{});
 }
 </script>
 </body>
