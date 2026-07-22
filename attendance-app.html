@@ -731,8 +731,8 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
     <div class="modal-title">ยื่นคำขอลา <button class="modal-close" onclick="closeModal('modal-leave')">✕</button></div>
     <div id="leave-emp-section" style="display:none;margin-bottom:12px">
       <div style="background:#FFF8E1;border:1px solid #F57F17;border-radius:8px;padding:10px 12px;margin-bottom:8px">
-        <div style="font-size:12px;font-weight:700;color:#E65100">👑 โหมด HR — บันทึกวันลาย้อนหลังให้พนักงาน</div>
-        <div style="font-size:11px;color:#E65100;margin-top:2px">ระบบจะอนุมัติอัตโนมัติ ไม่ต้องรออนุมัติ</div>
+        <div id="leave-management-title" style="font-size:12px;font-weight:700;color:#E65100">👑 จัดการวันลาให้พนักงาน</div>
+        <div id="leave-management-note" style="font-size:11px;color:#E65100;margin-top:2px">HR บันทึกข้อมูลเพื่อส่งให้ Owner อนุมัติขั้นสุดท้าย</div>
       </div>
       <label class="modal-label" style="margin-top:0">บันทึกให้พนักงาน</label>
       <select class="modal-select" id="leave-emp-select">
@@ -750,7 +750,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         <div class="leave-type-radio"></div>
       </div>
       <div class="leave-type-opt" onclick="selectLeaveType('vacation',this)">
-        <div style="font-size:20px">🌴</div><div><div style="font-weight:600">ลาพักร้อน</div><div style="font-size:11px;color:var(--text3)">คงเหลือ <span id="lt-vacation">3</span> วัน</div></div>
+        <div style="font-size:20px">🌴</div><div><div style="font-weight:600">ลาพักร้อน</div><div style="font-size:11px;color:var(--text3)">คงเหลือ <span id="lt-vacation">6</span> วัน</div></div>
         <div class="leave-type-radio"></div>
       </div>
       <div class="leave-type-opt" onclick="selectLeaveType('unpaid',this)">
@@ -766,7 +766,7 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
     <label class="modal-label">เหตุผลการลา</label>
     <textarea class="modal-textarea" id="leave-reason" placeholder="ระบุเหตุผล..."></textarea>
     <button class="btn-primary" id="btn-submit-leave" onclick="submitLeave()">ส่งคำขอลา</button>
-    <button class="btn-primary" id="btn-submit-leave-backdate" onclick="submitLeaveBackdate()" style="display:none;background:linear-gradient(135deg,#E65100,#FF6D00);margin-top:8px">📅 บันทึกย้อนหลัง (อนุมัติทันที)</button>
+    <button class="btn-primary" id="btn-submit-leave-backdate" onclick="submitLeaveBackdate()" style="display:none;background:linear-gradient(135deg,#E65100,#FF6D00);margin-top:8px">📅 บันทึกวันลาให้พนักงาน</button>
   </div>
 </div>
 
@@ -983,14 +983,16 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         <select class="modal-select" id="leave-summary-year" onchange="loadLeaveSummary()"></select>
       </div>
       <div style="flex:1;min-width:180px">
-        <label class="modal-label" for="leave-summary-search">ค้นหาพนักงาน</label>
-        <input class="modal-input" id="leave-summary-search" placeholder="พิมพ์ชื่อพนักงาน..." oninput="renderLeaveSummary()" style="margin-bottom:0">
+        <label class="modal-label" for="leave-summary-employee">พนักงาน</label>
+        <select class="modal-select" id="leave-summary-employee" onchange="renderLeaveSummary()" style="margin-bottom:0">
+          <option value="">พนักงานทุกคน</option>
+        </select>
       </div>
       <button class="btn-primary" onclick="exportLeaveSummary()" style="width:auto;min-width:150px;margin:0">📥 Export Excel</button>
     </div>
     <div id="leave-summary-cards" class="leave-summary-cards"></div>
     <div id="leave-summary-content"><div class="loading-text">กำลังโหลด...</div></div>
-    <div style="font-size:10px;color:var(--text3);margin-top:10px;line-height:1.5">นับเฉพาะรายการลาที่อนุมัติแล้วภายในปีที่เลือก · สิทธิ์มาตรฐาน: ลาป่วย 30 วัน ลากิจ 6 วัน ลาพักร้อน 3 วัน</div>
+    <div style="font-size:10px;color:var(--text3);margin-top:10px;line-height:1.5">นับเฉพาะรายการที่ Owner อนุมัติภายในปีที่เลือก · ลากิจ 6 วัน/ปี · ลาพักร้อน 6 วัน/ปีเมื่อทำงานครบ 1 ปี · สิทธิ์ที่เหลือสิ้นสุดวันที่ 31 ธันวาคมและไม่ทบไปปีถัดไป</div>
   </div>
 </div>
 
@@ -1026,8 +1028,8 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
     <label class="modal-label">หมายเหตุ</label>
     <input type="text" class="modal-input" id="edl-note" placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)">
     <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn-primary" onclick="saveEditLeave()" style="flex:1">💾 บันทึก</button>
-      <button onclick="confirmDeleteLeaveManage()" style="flex:0;background:#FFEBEE;border:none;color:var(--red);font-size:13px;font-weight:600;padding:10px 16px;border-radius:10px;cursor:pointer">🗑 ลบ</button>
+      <button class="btn-primary" id="btn-save-edit-leave" onclick="saveEditLeave()" style="flex:1">💾 บันทึก</button>
+      <button id="btn-delete-edit-leave" onclick="confirmDeleteLeaveManage()" style="flex:0;background:#FFEBEE;border:none;color:var(--red);font-size:13px;font-weight:600;padding:10px 16px;border-radius:10px;cursor:pointer">🗑 ลบ</button>
     </div>
   </div>
 </div>
@@ -1189,7 +1191,7 @@ let allEmps=[],allShifts=[],allBranches=[],bonusCfg=null,employeeWorkPatterns=[]
 let clockTick=null,gpsCached=null;
 let loginAuthType='pin';
 let pinSessionSecret='';
-const QUOTAS={sick:30,personal:6,vacation:3};
+const QUOTAS={sick:30,personal:6,vacation:6};
 const LLABELS={sick:'🏥 ลาป่วย',personal:'📋 ลากิจ',vacation:'🌴 ลาพักร้อน',unpaid:'💸 ลาหักเงิน'};
 const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
 
@@ -1211,6 +1213,54 @@ function fmtT(ts){
 }
 function dateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;} // YYYY-MM-DD เวลาท้องถิ่น (ไม่แปลง UTC)
 function todayStr(){return dateStr(new Date());}
+function parseISODate(value){
+  const[y,m,d]=String(value||'').split('-').map(Number);
+  return y&&m&&d?new Date(y,m-1,d):null;
+}
+function inclusiveLeaveDays(from,to){
+  const start=parseISODate(from),end=parseISODate(to);
+  if(!start||!end||end<start)return 0;
+  return Math.floor((Date.UTC(end.getFullYear(),end.getMonth(),end.getDate())-Date.UTC(start.getFullYear(),start.getMonth(),start.getDate()))/86400000)+1;
+}
+function vacationEligibleDate(employee){
+  const start=parseISODate(employee?.start_date);
+  if(!start)return'';
+  const targetYear=start.getFullYear()+1;
+  const maxDay=new Date(targetYear,start.getMonth()+1,0).getDate();
+  return dateStr(new Date(targetYear,start.getMonth(),Math.min(start.getDate(),maxDay)));
+}
+function leaveQuotaForDate(employee,type,asOfDate){
+  if(type!=='vacation')return QUOTAS[type]??null;
+  const eligibleFrom=vacationEligibleDate(employee);
+  return eligibleFrom&&eligibleFrom<=asOfDate?QUOTAS.vacation:0;
+}
+function leavePolicyDateError(employee,type,from,to){
+  if(!from||!to)return'กรุณาเลือกวันที่ให้ครบ';
+  if(to<from)return'วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่มลา';
+  if(['personal','vacation'].includes(type)&&from.slice(0,4)!==to.slice(0,4))return'ลากิจและลาพักร้อนที่ข้ามปี ต้องแยกเป็นคำขอของแต่ละปี';
+  if(type==='vacation'){
+    const eligibleFrom=vacationEligibleDate(employee);
+    if(!eligibleFrom)return'ไม่พบข้อมูลวันที่เริ่มงาน กรุณาให้ HR หรือ Owner ตรวจสอบ';
+    if(from<eligibleFrom)return`ลาพักร้อนได้ตั้งแต่ ${fmtDate(eligibleFrom)} หลังทำงานครบ 1 ปี`;
+  }
+  return'';
+}
+async function annualLeaveQuotaError(employee,type,from,to,days){
+  const dateError=leavePolicyDateError(employee,type,from,to);
+  if(dateError)return dateError;
+  if(!['personal','vacation'].includes(type))return'';
+  const year=Number(from.slice(0,4));
+  const quota=leaveQuotaForDate(employee,type,from);
+  const yearStart=`${year}-01-01`,yearEnd=`${year}-12-31`;
+  const{data,error}=await db.from('leave_requests').select('start_date,end_date,days').eq('employee_id',employee.id).eq('leave_type',type).eq('status','approved').lte('start_date',yearEnd).gte('end_date',yearStart);
+  if(error)return'ตรวจสอบสิทธิ์วันลาไม่สำเร็จ: '+error.message;
+  const used=(data||[]).reduce((sum,leave)=>sum+leaveDaysInsideYear(leave,year),0);
+  if(used+days>quota){
+    const label=type==='personal'?'ลากิจ':'ลาพักร้อน';
+    return`${label}ปี ${year+543} คงเหลือ ${Math.max(0,quota-used)} วัน (อนุมัติแล้ว ${used} จากสิทธิ์ ${quota} วัน)`;
+  }
+  return'';
+}
 function employeeInServiceOnDate(employee,date){
   if(employee.start_date&&date<employee.start_date)return false;
   if(employee.resigned_at&&date>employee.resigned_at)return false;
@@ -1747,18 +1797,12 @@ async function loadLeave(){
   const used={sick:0,personal:0,vacation:0};
   data?.filter(l=>l.status==='approved').forEach(l=>{
     if(used[l.leave_type]===undefined)return;
-    // ลาพักร้อน นับเฉพาะปีปัจจุบัน (ไม่สะสมข้ามปี)
-    if(l.leave_type==='vacation'){
-      const leaveYear=new Date(l.start_date).getFullYear();
-      if(leaveYear===thisYear) used[l.leave_type]+=l.days;
-    } else {
-      used[l.leave_type]+=l.days;
-    }
+    used[l.leave_type]+=leaveDaysInsideYear(l,thisYear);
   });
   Object.keys(QUOTAS).forEach(t=>{
-    const q=QUOTAS[t],u=used[t]||0,rem=q-u;
+    const q=leaveQuotaForDate(user,t,todayStr()),u=used[t]||0,rem=Math.max(0,q-u);
     document.getElementById('ql-'+t).textContent=rem;
-    document.getElementById('qf-'+t).style.width=Math.min((u/q)*100,100)+'%';
+    document.getElementById('qf-'+t).style.width=(q?Math.min((u/q)*100,100):0)+'%';
     const ltEl=document.getElementById('lt-'+t);if(ltEl)ltEl.textContent=rem;
   });
   const el=document.getElementById('leave-history');
@@ -1777,7 +1821,7 @@ async function loadLeave(){
     ${l.note?`<div style="font-size:11px;color:var(--text3);margin-top:4px;padding:6px 8px;background:var(--gray);border-radius:6px">หมายเหตุ: ${l.note}</div>`:''}
   </div>`).join('');
 }
-function openLeaveModal(){
+async function openLeaveModal(){
   openModal('modal-leave');
   document.getElementById('leave-from').value=todayStr();
   document.getElementById('leave-to').value=todayStr();
@@ -1788,15 +1832,26 @@ function openLeaveModal(){
   // แสดงปุ่มตาม role
   document.getElementById('btn-submit-leave').style.display = isHROrOwner ? 'none' : 'block';
   document.getElementById('btn-submit-leave-backdate').style.display = isHROrOwner ? 'block' : 'none';
+  const managementNote=document.getElementById('leave-management-note');
+  const managementTitle=document.getElementById('leave-management-title');
+  const managementButton=document.getElementById('btn-submit-leave-backdate');
+  if(managementTitle)managementTitle.textContent=user.role==='owner'?'👑 โหมด Owner — จัดการวันลาให้พนักงาน':'🧑‍💼 โหมด HR — จัดเตรียมวันลาให้พนักงาน';
+  if(managementNote)managementNote.textContent=user.role==='owner'?'Owner บันทึกและอนุมัติรายการนี้ได้ทันที':'HR บันทึกข้อมูลเพื่อส่งให้ Owner อนุมัติขั้นสุดท้าย';
+  if(managementButton)managementButton.textContent=user.role==='owner'?'📅 บันทึกและอนุมัติ':'📅 บันทึกเพื่อรอ Owner อนุมัติ';
   // โหลดรายชื่อพนักงานสำหรับ HR
   if(isHROrOwner){
+    if(!allEmps.length){
+      const{data,error}=await db.from('employees').select('*').order('name');
+      if(error){toast('โหลดรายชื่อพนักงานไม่สำเร็จ: '+error.message,'#E53935');return;}
+      allEmps=data||[];
+    }
     const sel = document.getElementById('leave-emp-select');
     if(sel){
-      sel.innerHTML='<option value="">-- เลือกพนักงาน (ค่าเริ่มต้น: ตัวเอง) --</option>';
-      allEmps.forEach(e=>{
+      sel.innerHTML='<option value="">-- เลือกพนักงาน --</option>';
+      allEmps.filter(e=>['employee','hr'].includes(e.role)&&e.payroll_eligible!==false).forEach(e=>{
         const o=document.createElement('option');
         o.value=e.id;
-        o.textContent=e.name+(e.department?' ('+e.department+')':'');
+        o.textContent=e.name+(e.department?' ('+e.department+')':'')+(e.status==='resigned'?' · ลาออกแล้ว':'');
         sel.appendChild(o);
       });
     }
@@ -1809,9 +1864,9 @@ function selectLeaveType(type,el){
 }
 function updateDays(){
   const f=document.getElementById('leave-from').value,t=document.getElementById('leave-to').value;
-  if(f&&t){const d=Math.max(1,Math.floor((new Date(t)-new Date(f))/86400000)+1);document.getElementById('days-badge').textContent='รวม '+d+' วัน';}
+  if(f&&t){const d=inclusiveLeaveDays(f,t);document.getElementById('days-badge').textContent=d?'รวม '+d+' วัน':'ช่วงวันที่ไม่ถูกต้อง';}
 }
-// HR บันทึกวันลาย้อนหลัง — ข้ามกฎ validation ทั้งหมด
+// HR จัดเตรียมรายการวันลาให้ Owner อนุมัติ ส่วน Owner อนุมัติได้ทันที
 async function submitLeaveBackdate(){
   if(user.role!=='hr'&&user.role!=='owner'){toast('❌ สิทธิ์ HR เท่านั้น','#E53935');return;}
   const from=document.getElementById('leave-from').value;
@@ -1820,26 +1875,35 @@ async function submitLeaveBackdate(){
   if(!from||!to){toast('กรุณาเลือกวันที่ให้ครบ','#E53935');return;}
   if(!reason){toast('กรุณาระบุเหตุผล','#E53935');return;}
 
-  // เลือกพนักงาน (ถ้าไม่เลือก = ตัวเอง)
+  // ต้องเลือกจากทะเบียนพนักงาน เพื่อป้องกันการลงรายการผิดบัญชี
   const sel=document.getElementById('leave-emp-select');
-  const empId=sel&&sel.value?sel.value:user.id;
-  const empName=sel&&sel.value?(allEmps.find(e=>e.id===sel.value)||{}).name||'':user.name;
+  if(!sel?.value){toast('กรุณาเลือกพนักงาน','#E53935');return;}
+  const empId=sel.value;
+  const employee=allEmps.find(e=>e.id===empId);
+  const empName=employee?.name||'';
+  if(!employee){toast('ไม่พบข้อมูลพนักงาน กรุณาโหลดหน้าจอใหม่','#E53935');return;}
 
-  const days=Math.max(1,Math.floor((new Date(to)-new Date(from+'T00:00:00'))/86400000)+1);
-
-  const{error}=await db.from('leave_requests').insert({
+  const days=inclusiveLeaveDays(from,to);
+  if(!days){toast('ช่วงวันที่ลาไม่ถูกต้อง','#E53935');return;}
+  const policyError=await annualLeaveQuotaError(employee,selLeaveType,from,to,days);
+  if(policyError){alert('❌ '+policyError);return;}
+  const isOwner=user.role==='owner';
+  const record={
     employee_id:empId,
     leave_type:selLeaveType,
     start_date:from,
     end_date:to,
     days,
     reason,
-    status:'approved',
-    note:`บันทึกย้อนหลังโดย HR (${user.name})`
-  });
+    status:isOwner?'approved':'acknowledged',
+    note:isOwner?`บันทึกและอนุมัติโดย Owner (${user.name})`:`บันทึกโดย HR (${user.name}) · รอ Owner อนุมัติ`
+  };
+  if(isOwner)record.approved_by=user.id;
+
+  const{error}=await db.from('leave_requests').insert(record);
   if(error){toast('Error: '+error.message,'#E53935');return;}
   closeModal('modal-leave');
-  toast(`✅ บันทึกย้อนหลังให้ ${empName||user.name} แล้ว — ${days} วัน อนุมัติแล้ว`,'#0B9E82');
+  toast(isOwner?`✅ บันทึกและอนุมัติให้ ${empName} แล้ว ${days} วัน`:`📋 บันทึกให้ ${empName} แล้ว · รอ Owner อนุมัติ`,'#0B9E82');
   loadLeave();loadHome();
   loadApproveCount();
 }
@@ -1847,6 +1911,10 @@ async function submitLeaveBackdate(){
 async function submitLeave(){
   const from=document.getElementById('leave-from').value,to=document.getElementById('leave-to').value,reason=document.getElementById('leave-reason').value;
   if(!from||!to||!reason){toast('กรุณากรอกข้อมูลให้ครบ');return;}
+  const days=inclusiveLeaveDays(from,to);
+  if(!days){toast('ช่วงวันที่ลาไม่ถูกต้อง','#E53935');return;}
+  const policyError=await annualLeaveQuotaError(user,selLeaveType,from,to,days);
+  if(policyError){alert('❌ '+policyError);return;}
 
   const now=new Date();
   const fromDate=new Date(from+'T00:00:00');
@@ -1876,39 +1944,11 @@ async function submitLeave(){
         errMsg='❌ ลาป่วยล่วงหน้าต้องแจ้งก่อนอย่างน้อย 12 ชั่วโมง\nหากป่วยฉุกเฉิน สามารถลาย้อนหลังได้ไม่เกิน 2 วัน';
       }
     }
-  } else if(selLeaveType==='vacation'){
-    // ลาพักร้อน ต้องทำงานเกิน 1 ปี
-    if(user.start_date){
-      const startD=new Date(user.start_date);
-      const workDays=(now-startD)/86400000;
-      if(workDays<365){
-        const daysLeft=Math.ceil(365-workDays);
-        errMsg=`❌ สิทธิ์ลาพักร้อนได้เมื่อทำงานครบ 1 ปี\nอีก ${daysLeft} วัน จึงจะมีสิทธิ์ลาพักร้อน`;
-      }
-    } else {
-      errMsg='❌ ไม่พบข้อมูลวันที่เริ่มงาน กรุณาติดต่อ HR';
-    }
   }
 
   if(errMsg){
     alert(errMsg);
     return;
-  }
-
-  const days=Math.max(1,Math.floor((new Date(to)-fromDate)/86400000)+1);
-
-  // เช็คโควต้าลาพักร้อน (3 วัน)
-  if(selLeaveType==='vacation'){
-    const thisYr=new Date().getFullYear();
-    const yrStart=`${thisYr}-01-01`;
-    const yrEnd=`${thisYr}-12-31`;
-    const{data:usedRec}=await db.from('leave_requests').select('days').eq('employee_id',user.id).eq('leave_type','vacation').eq('status','approved').gte('start_date',yrStart).lte('start_date',yrEnd);
-    const usedDays=(usedRec||[]).reduce((s,r)=>s+r.days,0);
-    if(usedDays+days>3){
-      alert(`❌ สิทธิ์ลาพักร้อนปีนี้คงเหลือ ${3-usedDays} วัน (ใช้ไปแล้ว ${usedDays} วัน จากสิทธิ์ 3 วัน/ปี)
-⚠️ สิทธิ์ไม่สะสมข้ามปี`);
-      return;
-    }
   }
 
   const note=isBackdate&&selLeaveType==='sick'?'ลาป่วยฉุกเฉิน (ย้อนหลัง)':null;
@@ -2354,7 +2394,8 @@ function openApproveDetail(id){
 }
 async function quickDecide(id,status){
   const upd=status==='acknowledged'?{status}:{status,approved_by:user.id};
-  await db.from('leave_requests').update(upd).eq('id',id);
+  const{error}=await db.from('leave_requests').update(upd).eq('id',id);
+  if(error){toast('ดำเนินการไม่ได้: '+error.message,'#E53935');return;}
   const msg=status==='approved'?'✅ อนุมัติแล้ว':status==='rejected'?'❌ ไม่อนุมัติ':'👀 รับทราบแล้ว ส่งต่อเจ้าของ';
   toast(msg,status==='rejected'?'#E53935':'#0B9E82');
   loadApproveList();loadApproveCount();
@@ -2363,7 +2404,8 @@ async function decideLeave(status){
   if(!selLeaveId)return;
   const note=document.getElementById('approve-note').value;
   const upd=status==='acknowledged'?{status,note}:{status,approved_by:user.id,note};
-  await db.from('leave_requests').update(upd).eq('id',selLeaveId);
+  const{error}=await db.from('leave_requests').update(upd).eq('id',selLeaveId);
+  if(error){toast('ดำเนินการไม่ได้: '+error.message,'#E53935');return;}
   closeModal('modal-approve-detail');
   const msg=status==='approved'?'✅ อนุมัติแล้ว':status==='rejected'?'❌ ไม่อนุมัติ':'👀 รับทราบแล้ว ส่งต่อเจ้าของ';
   toast(msg,status==='rejected'?'#E53935':'#0B9E82');
@@ -3447,7 +3489,7 @@ async function openLeaveSummary(){
     const currentYear=new Date().getFullYear();
     select.innerHTML=Array.from({length:6},(_,i)=>currentYear-i).map(year=>`<option value="${year}">${year+543}</option>`).join('');
   }
-  document.getElementById('leave-summary-search').value='';
+  document.getElementById('leave-summary-employee').value='';
   openModal('modal-leave-summary');
   await loadLeaveSummary();
 }
@@ -3457,7 +3499,7 @@ async function loadLeaveSummary(){
   const content=document.getElementById('leave-summary-content');
   content.innerHTML='<div class="loading-text">กำลังคำนวณวันลา...</div>';
   const[{data:employees,error:employeeError},{data:leaves,error:leaveError}]=await Promise.all([
-    db.from('employees').select('id,name,department,start_date,resigned_at,status,role').eq('role','employee').order('name'),
+    db.from('employees').select('id,name,department,start_date,resigned_at,status,role,payroll_eligible,attendance_required').in('role',['employee','hr']).order('name'),
     db.from('leave_requests').select('employee_id,leave_type,start_date,end_date,days,status').eq('status','approved').lte('start_date',yearEnd).gte('end_date',yearStart)
   ]);
   if(employeeError||leaveError){
@@ -3465,20 +3507,26 @@ async function loadLeaveSummary(){
     toast(employeeError?.message||leaveError?.message||'โหลดข้อมูลไม่สำเร็จ','#E53935');
     return;
   }
-  const inYear=(employees||[]).filter(employee=>(!employee.start_date||employee.start_date<=yearEnd)&&(!employee.resigned_at||employee.resigned_at>=yearStart));
+  const inYear=(employees||[]).filter(employee=>employee.payroll_eligible!==false&&employee.attendance_required!==false&&(!employee.start_date||employee.start_date<=yearEnd)&&(!employee.resigned_at||employee.resigned_at>=yearStart));
+  const employeeSelect=document.getElementById('leave-summary-employee');
+  const previousEmployee=employeeSelect.value;
+  employeeSelect.innerHTML='<option value="">พนักงานทุกคน</option>'+inYear.map(employee=>`<option value="${escapeLeaveSummaryHtml(employee.id)}">${escapeLeaveSummaryHtml(employee.name)}${employee.department?` (${escapeLeaveSummaryHtml(employee.department)})`:''}</option>`).join('');
+  if(inYear.some(employee=>employee.id===previousEmployee))employeeSelect.value=previousEmployee;
+  const today=todayStr();
+  const quotaAsOf=year===new Date().getFullYear()?(today<yearEnd?today:yearEnd):yearEnd;
   leaveSummaryRows=inYear.map(employee=>{
     const used={sick:0,personal:0,vacation:0,unpaid:0};
     (leaves||[]).filter(leave=>leave.employee_id===employee.id).forEach(leave=>{
       if(Object.hasOwn(used,leave.leave_type))used[leave.leave_type]+=leaveDaysInsideYear(leave,year);
     });
     Object.keys(used).forEach(type=>used[type]=Number(used[type].toFixed(2)));
-    return{employee,...used,total:Number(Object.values(used).reduce((sum,value)=>sum+value,0).toFixed(2))};
+    return{employee,...used,vacationQuota:leaveQuotaForDate(employee,'vacation',quotaAsOf),vacationEligibleFrom:vacationEligibleDate(employee),total:Number(Object.values(used).reduce((sum,value)=>sum+value,0).toFixed(2))};
   });
   renderLeaveSummary();
 }
 function filteredLeaveSummaryRows(){
-  const search=document.getElementById('leave-summary-search').value.trim().toLocaleLowerCase('th');
-  return search?leaveSummaryRows.filter(row=>`${row.employee.name} ${row.employee.department||''}`.toLocaleLowerCase('th').includes(search)):leaveSummaryRows;
+  const employeeId=document.getElementById('leave-summary-employee').value;
+  return employeeId?leaveSummaryRows.filter(row=>row.employee.id===employeeId):leaveSummaryRows;
 }
 function renderLeaveSummary(){
   const rows=filteredLeaveSummaryRows();
@@ -3499,7 +3547,7 @@ function renderLeaveSummary(){
       <td>${row.employee.resigned_at?`<span class="leave-badge status-badge-rejected">ลาออก ${fmtDate(row.employee.resigned_at)}</span>`:'<span class="leave-badge status-badge-approved">ทำงาน</span>'}</td>
       <td>${leaveSummaryCell(row.sick,QUOTAS.sick)}</td>
       <td>${leaveSummaryCell(row.personal,QUOTAS.personal)}</td>
-      <td>${leaveSummaryCell(row.vacation,QUOTAS.vacation)}</td>
+      <td>${leaveSummaryCell(row.vacation,row.vacationQuota)}${row.vacationQuota===0?`<div style="font-size:9px;color:var(--text3);margin-top:2px">${row.vacationEligibleFrom?`เริ่ม ${fmtDate(row.vacationEligibleFrom)}`:'รอตรวจวันเริ่มงาน'}</div>`:''}</td>
       <td>${leaveSummaryCell(row.unpaid,null)}</td>
       <td><strong>${formatLeaveSummaryDays(row.total)}</strong> วัน</td>
     </tr>`).join('')}</tbody>
@@ -3513,7 +3561,8 @@ function exportLeaveSummary(){
     พนักงาน:row.employee.name,แผนก:row.employee.department||'',สถานะ:row.employee.resigned_at?'ลาออก':'ทำงาน',
     ลาป่วย_ใช้แล้ว:row.sick,ลาป่วย_คงเหลือ:Math.max(0,QUOTAS.sick-row.sick),
     ลากิจ_ใช้แล้ว:row.personal,ลากิจ_คงเหลือ:Math.max(0,QUOTAS.personal-row.personal),
-    ลาพักร้อน_ใช้แล้ว:row.vacation,ลาพักร้อน_คงเหลือ:Math.max(0,QUOTAS.vacation-row.vacation),
+    ลาพักร้อน_เริ่มมีสิทธิ์:row.vacationEligibleFrom||'รอตรวจวันเริ่มงาน',ลาพักร้อน_สิทธิ์ปีนี้:row.vacationQuota,
+    ลาพักร้อน_ใช้แล้ว:row.vacation,ลาพักร้อน_คงเหลือ:Math.max(0,row.vacationQuota-row.vacation),
     ลาไม่รับค่าจ้าง:row.unpaid,วันลารวม:row.total
   }));
   const workbook=XLSX.utils.book_new();
@@ -3524,11 +3573,14 @@ function exportLeaveSummary(){
 }
 
 async function openLeaveManage(){
-  const{data}=await db.from('leave_requests').select('*,employees(name)').order('start_date',{ascending:false});
+  const[{data},{data:employees}]=await Promise.all([
+    db.from('leave_requests').select('*,employees(name)').order('start_date',{ascending:false}),
+    db.from('employees').select('id,name,department,role,payroll_eligible,attendance_required').in('role',['employee','hr']).order('name')
+  ]);
   allLeaveData=data||[];
   const sel=document.getElementById('lm-emp-filter');
-  const names=[...new Set(allLeaveData.map(l=>l.employees?.name).filter(Boolean))].sort();
-  sel.innerHTML='<option value="">ทุกคน</option>'+names.map(n=>`<option value="${n}">${n}</option>`).join('');
+  const roster=(employees||[]).filter(employee=>employee.payroll_eligible!==false&&employee.attendance_required!==false);
+  sel.innerHTML='<option value="">ทุกคน</option>'+roster.map(employee=>`<option value="${escapeLeaveSummaryHtml(employee.id)}">${escapeLeaveSummaryHtml(employee.name)}${employee.department?` (${escapeLeaveSummaryHtml(employee.department)})`:''}</option>`).join('');
   const msel=document.getElementById('lm-month-filter');
   const months=[...new Set(allLeaveData.map(l=>l.start_date?.substring(0,7)).filter(Boolean))].sort().reverse();
   msel.innerHTML='<option value="">ทุกเดือน</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
@@ -3539,7 +3591,7 @@ function filterLeaveManage(){
   const emp=document.getElementById('lm-emp-filter').value;
   const mon=document.getElementById('lm-month-filter').value;
   let list=allLeaveData;
-  if(emp)list=list.filter(l=>l.employees?.name===emp);
+  if(emp)list=list.filter(l=>l.employee_id===emp);
   if(mon)list=list.filter(l=>l.start_date?.startsWith(mon));
   const el=document.getElementById('leave-manage-list');
   if(!list.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">ไม่พบรายการ</div></div>';return;}
@@ -3564,6 +3616,12 @@ function openEditLeave(id){
   document.getElementById('edl-reason').value=l.reason||'';
   document.getElementById('edl-status').value=l.status;
   document.getElementById('edl-note').value=l.note||'';
+  const isOwner=user.role==='owner';
+  const finalLocked=!isOwner&&['approved','rejected'].includes(l.status);
+  [...document.getElementById('edl-status').options].forEach(option=>option.disabled=!isOwner&&['approved','rejected'].includes(option.value));
+  for(const fieldId of ['edl-type','edl-from','edl-to','edl-reason','edl-status'])document.getElementById(fieldId).disabled=finalLocked;
+  document.getElementById('btn-save-edit-leave').style.display=finalLocked?'none':'block';
+  document.getElementById('btn-delete-edit-leave').style.display=finalLocked?'none':'block';
   document.getElementById('edl-from').onchange=document.getElementById('edl-to').onchange=()=>{
     const f=document.getElementById('edl-from').value,t=document.getElementById('edl-to').value;
     if(f&&t)document.getElementById('edl-days').value=Math.max(1,Math.floor((new Date(t)-new Date(f))/86400000)+1);
@@ -3581,6 +3639,7 @@ async function saveEditLeave(){
     status:document.getElementById('edl-status').value,
     note:document.getElementById('edl-note').value
   };
+  if(user.role!=='owner'&&['approved','rejected'].includes(upd.status)){toast('เฉพาะ Owner เท่านั้นที่ตัดสินผลวันลาได้','#E53935');return;}
   const{error}=await db.from('leave_requests').update(upd).eq('id',id);
   if(error){toast('บันทึกไม่ได้: '+error.message,'#E53935');return;}
   toast('💾 บันทึกแล้ว','#0B9E82');
@@ -4072,7 +4131,7 @@ async function loadMyPayslip(){
 </script>
 <script>
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=16').catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=17').catch(()=>{});
 }
 </script>
 </body>
