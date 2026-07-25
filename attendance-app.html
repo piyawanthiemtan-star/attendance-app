@@ -758,9 +758,13 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
         <div class="leave-type-radio"></div>
       </div>
     </div>
+    <label class="halfday-toggle" id="halfday-toggle-row" style="display:flex;align-items:center;gap:8px;margin:10px 0 6px;cursor:pointer;font-size:14px">
+      <input type="checkbox" id="leave-halfday" onchange="toggleHalfDay()" style="width:18px;height:18px;flex:0 0 auto;accent-color:#0B9E82">
+      <span style="font-weight:600">ลาครึ่งวัน (0.5 วัน)</span>
+    </label>
     <div class="date-row">
-      <div class="date-box"><label>วันที่เริ่มลา</label><input type="date" id="leave-from" onchange="updateDays()"></div>
-      <div class="date-box"><label>วันที่สิ้นสุด</label><input type="date" id="leave-to" onchange="updateDays()"></div>
+      <div class="date-box"><label id="leave-from-label">วันที่เริ่มลา</label><input type="date" id="leave-from" onchange="updateDays()"></div>
+      <div class="date-box" id="leave-to-box"><label>วันที่สิ้นสุด</label><input type="date" id="leave-to" onchange="updateDays()"></div>
     </div>
     <div class="days-badge" id="days-badge">รวม 1 วัน</div>
     <label class="modal-label">เหตุผลการลา</label>
@@ -1186,11 +1190,13 @@ const SB_KEY='sb_publishable_i8vu7SQnl7LXjCsxMYcVIg_TebMf2MC';
 const{createClient}=supabase;
 const db=createClient(SB_URL,SB_KEY);
 
-let user=null,todayAtt=null,selLeaveId=null,selLeaveType='sick';
+let user=null,todayAtt=null,selLeaveId=null,selLeaveType='sick',selHalfDay=false;
 let allEmps=[],allShifts=[],allBranches=[],bonusCfg=null,employeeWorkPatterns=[],employeeDayOffSwaps=[],attendanceChangeRequests=[];
 let clockTick=null,gpsCached=null;
 let loginAuthType='pin';
 let pinSessionSecret='';
+// ลาครึ่งวัน: เปิดใช้เมื่อ apply migration 20260723090000 (days -> numeric) บน Supabase แล้วเท่านั้น
+const HALF_DAY_LEAVE_ENABLED=false;
 const QUOTAS={sick:30,personal:6,vacation:6};
 const LLABELS={sick:'🏥 ลาป่วย',personal:'📋 ลากิจ',vacation:'🌴 ลาพักร้อน',unpaid:'💸 ลาหักเงิน'};
 const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
@@ -1823,9 +1829,12 @@ async function loadLeave(){
 }
 async function openLeaveModal(){
   openModal('modal-leave');
+  const halfRow=document.getElementById('halfday-toggle-row');
+  if(halfRow)halfRow.style.display=HALF_DAY_LEAVE_ENABLED?'flex':'none';
+  document.getElementById('leave-halfday').checked=false;
   document.getElementById('leave-from').value=todayStr();
   document.getElementById('leave-to').value=todayStr();
-  updateDays();
+  toggleHalfDay();
   const isHROrOwner = user.role==='hr'||user.role==='owner';
   const empSection = document.getElementById('leave-emp-section');
   if(empSection) empSection.style.display = isHROrOwner ? 'block' : 'none';
@@ -1862,15 +1871,42 @@ function selectLeaveType(type,el){
   document.querySelectorAll('.leave-type-opt').forEach(o=>o.classList.remove('selected'));
   el.classList.add('selected');
 }
+function toggleHalfDay(){
+  selHalfDay=HALF_DAY_LEAVE_ENABLED&&!!document.getElementById('leave-halfday').checked;
+  const toBox=document.getElementById('leave-to-box');
+  const fromLabel=document.getElementById('leave-from-label');
+  if(selHalfDay){
+    toBox.style.display='none';
+    fromLabel.textContent='วันที่ลา';
+    document.getElementById('leave-to').value=document.getElementById('leave-from').value;
+  }else{
+    toBox.style.display='';
+    fromLabel.textContent='วันที่เริ่มลา';
+  }
+  updateDays();
+}
+// จำนวนวันลาตามฟอร์ม: ครึ่งวัน = 0.5 (วันเดียวเสมอ) มิฉะนั้นนับช่วงวันแบบรวมปลาย
+function selectedLeaveDays(){
+  const from=document.getElementById('leave-from').value;
+  if(selHalfDay)return from?0.5:0;
+  return inclusiveLeaveDays(from,document.getElementById('leave-to').value);
+}
 function updateDays(){
-  const f=document.getElementById('leave-from').value,t=document.getElementById('leave-to').value;
-  if(f&&t){const d=inclusiveLeaveDays(f,t);document.getElementById('days-badge').textContent=d?'รวม '+d+' วัน':'ช่วงวันที่ไม่ถูกต้อง';}
+  const from=document.getElementById('leave-from').value;
+  if(selHalfDay){
+    document.getElementById('leave-to').value=from;
+    document.getElementById('days-badge').textContent=from?'รวมครึ่งวัน (0.5 วัน)':'ช่วงวันที่ไม่ถูกต้อง';
+    return;
+  }
+  const t=document.getElementById('leave-to').value;
+  if(from&&t){const d=inclusiveLeaveDays(from,t);document.getElementById('days-badge').textContent=d?'รวม '+d+' วัน':'ช่วงวันที่ไม่ถูกต้อง';}
 }
 // HR จัดเตรียมรายการวันลาให้ Owner อนุมัติ ส่วน Owner อนุมัติได้ทันที
 async function submitLeaveBackdate(){
   if(user.role!=='hr'&&user.role!=='owner'){toast('❌ สิทธิ์ HR เท่านั้น','#E53935');return;}
+  const half=HALF_DAY_LEAVE_ENABLED&&!!document.getElementById('leave-halfday').checked;
   const from=document.getElementById('leave-from').value;
-  const to=document.getElementById('leave-to').value;
+  const to=half?from:document.getElementById('leave-to').value;
   const reason=document.getElementById('leave-reason').value;
   if(!from||!to){toast('กรุณาเลือกวันที่ให้ครบ','#E53935');return;}
   if(!reason){toast('กรุณาระบุเหตุผล','#E53935');return;}
@@ -1883,11 +1919,12 @@ async function submitLeaveBackdate(){
   const empName=employee?.name||'';
   if(!employee){toast('ไม่พบข้อมูลพนักงาน กรุณาโหลดหน้าจอใหม่','#E53935');return;}
 
-  const days=inclusiveLeaveDays(from,to);
+  const days=half?0.5:inclusiveLeaveDays(from,to);
   if(!days){toast('ช่วงวันที่ลาไม่ถูกต้อง','#E53935');return;}
   const policyError=await annualLeaveQuotaError(employee,selLeaveType,from,to,days);
   if(policyError){alert('❌ '+policyError);return;}
   const isOwner=user.role==='owner';
+  const baseNote=isOwner?`บันทึกและอนุมัติโดย Owner (${user.name})`:`บันทึกโดย HR (${user.name}) · รอ Owner อนุมัติ`;
   const record={
     employee_id:empId,
     leave_type:selLeaveType,
@@ -1896,7 +1933,7 @@ async function submitLeaveBackdate(){
     days,
     reason,
     status:isOwner?'approved':'acknowledged',
-    note:isOwner?`บันทึกและอนุมัติโดย Owner (${user.name})`:`บันทึกโดย HR (${user.name}) · รอ Owner อนุมัติ`
+    note:half?`ลาครึ่งวัน · ${baseNote}`:baseNote
   };
   if(isOwner)record.approved_by=user.id;
 
@@ -1909,9 +1946,10 @@ async function submitLeaveBackdate(){
 }
 
 async function submitLeave(){
-  const from=document.getElementById('leave-from').value,to=document.getElementById('leave-to').value,reason=document.getElementById('leave-reason').value;
+  const half=HALF_DAY_LEAVE_ENABLED&&!!document.getElementById('leave-halfday').checked;
+  const from=document.getElementById('leave-from').value,to=half?from:document.getElementById('leave-to').value,reason=document.getElementById('leave-reason').value;
   if(!from||!to||!reason){toast('กรุณากรอกข้อมูลให้ครบ');return;}
-  const days=inclusiveLeaveDays(from,to);
+  const days=half?0.5:inclusiveLeaveDays(from,to);
   if(!days){toast('ช่วงวันที่ลาไม่ถูกต้อง','#E53935');return;}
   const policyError=await annualLeaveQuotaError(user,selLeaveType,from,to,days);
   if(policyError){alert('❌ '+policyError);return;}
@@ -1951,7 +1989,8 @@ async function submitLeave(){
     return;
   }
 
-  const note=isBackdate&&selLeaveType==='sick'?'ลาป่วยฉุกเฉิน (ย้อนหลัง)':null;
+  let note=isBackdate&&selLeaveType==='sick'?'ลาป่วยฉุกเฉิน (ย้อนหลัง)':null;
+  if(half)note=note?`ลาครึ่งวัน · ${note}`:'ลาครึ่งวัน';
   const{error}=await db.from('leave_requests').insert({employee_id:user.id,leave_type:selLeaveType,start_date:from,end_date:to,days,reason,status,note});
   if(error){toast('Error: '+error.message,'#E53935');return;}
   closeModal('modal-leave');
