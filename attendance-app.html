@@ -850,6 +850,8 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
       </div>
     </div>
     <label class="modal-label">สาขา *</label><select class="modal-select" id="empf-branch"><option value="">-- เลือกสาขา --</option></select>
+    <label class="modal-label">กะประจำ *</label><select class="modal-select" id="empf-shift"><option value="">-- เลือกกะ --</option></select>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px">ใช้คำนวณการมาสาย และจำเป็นสำหรับการสลับวันหยุด (เว้นว่างได้เฉพาะพนักงานที่ยกเว้นลงเวลา)</div>
     <div style="font-size:11px;color:var(--text3);margin:2px 0 6px;padding:6px 8px;background:#E3F2FD;border-radius:6px">ℹ️ กะการทำงานเลือกตอนเช็คอินแต่ละวัน (ไม่ต้องกำหนดล่วงหน้า)</div>
     <div style="font-size:11px;font-weight:700;color:var(--teal2);margin:14px 0 6px;letter-spacing:.5px">ตารางวันทำงาน</div>
     <label class="modal-label" style="margin-top:0">วันหยุดประจำสัปดาห์</label>
@@ -2544,6 +2546,9 @@ async function openEmpForm(id){
   const sel2=document.getElementById('empf-branch');
   sel2.innerHTML='<option value="">-- เลือกสาขา --</option>';
   allBranches.forEach(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=b.name;sel2.appendChild(o);});
+  const shiftSel=document.getElementById('empf-shift');
+  shiftSel.innerHTML='<option value="">-- เลือกกะ --</option>';
+  allShifts.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=`${s.shift_name} (${s.check_in_time.substring(0,5)}–${s.check_out_time.substring(0,5)})`;shiftSel.appendChild(o);});
   const roleSelect=document.getElementById('empf-role');
   roleSelect.disabled=user.role!=='owner';
   document.getElementById('empf-role-label').textContent=user.role==='owner'?'บทบาท *':'บทบาท · Owner เป็นผู้กำหนด';
@@ -2562,6 +2567,7 @@ async function openEmpForm(id){
     document.getElementById('empf-banknote').value=e.bank_note||'';
     document.getElementById('empf-pin').value=e.pin||'';
     document.getElementById('empf-branch').value=e.branch_id||'';
+    document.getElementById('empf-shift').value=e.shift_id||'';
     document.getElementById('empf-role').value=e.role||'employee';
     document.getElementById('empf-email').value=e.email||'';
     renderEmployeeAccountControls(e);
@@ -2598,6 +2604,7 @@ async function openEmpForm(id){
     document.getElementById('empf-bank').value='';
     document.getElementById('empf-dept').value='';
     document.getElementById('empf-branch').value='';
+    document.getElementById('empf-shift').value='';
     document.getElementById('empf-role').value='employee';document.getElementById('empf-delete').style.display='none';
     document.getElementById('empf-email').value='';
     document.getElementById('empf-account-section').style.display='none';
@@ -2739,14 +2746,15 @@ async function saveEmp(){
   const bank_note=document.getElementById('empf-banknote').value.trim()||null;
   const pin=document.getElementById('empf-pin').value.trim();
   const branch_id=document.getElementById('empf-branch').value||null;
+  const shift_id=document.getElementById('empf-shift').value||null;
   const existingEmployee=id?allEmps.find(e=>e.id===id):null;
   const role=user.role==='owner'?(document.getElementById('empf-role').value||'employee'):(existingEmployee?.role||'employee');
   if(!name||!phone||!pin){toast('กรุณากรอกชื่อ เบอร์โทร และ PIN','#E53935');return;}
   if(pin.length!==4||isNaN(pin)){toast('PIN ต้องเป็นตัวเลข 4 หลัก','#E53935');return;}
   let error, savedId = id;
-  if(id){({error}=await db.from('employees').update({name,phone,address,department:dept,position,start_date,bank_name,bank_account,bank_note,pin,branch_id,role}).eq('id',id));}
+  if(id){({error}=await db.from('employees').update({name,phone,address,department:dept,position,start_date,bank_name,bank_account,bank_note,pin,branch_id,shift_id,role}).eq('id',id));}
   else{
-    const{data:newEmp,error:insErr}=await db.from('employees').insert({name,phone,address,department:dept,position,start_date,bank_name,bank_account,bank_note,pin,branch_id,role}).select('id').single();
+    const{data:newEmp,error:insErr}=await db.from('employees').insert({name,phone,address,department:dept,position,start_date,bank_name,bank_account,bank_note,pin,branch_id,shift_id,role}).select('id').single();
     error=insErr; if(newEmp) savedId=newEmp.id;
   }
   if(error){toast('Error: '+(error.message.includes('unique')?'Email นี้มีอยู่แล้ว':error.message),'#E53935');return;}
