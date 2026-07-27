@@ -920,6 +920,11 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
     <input class="modal-input" id="edit-att-checkin" placeholder="08:00" maxlength="5" inputmode="numeric">
     <label class="modal-label">เวลาออกงาน (HH:MM)</label>
     <input class="modal-input" id="edit-att-checkout" placeholder="18:00" maxlength="5" inputmode="numeric">
+    <div id="edit-att-shift-row">
+      <label class="modal-label">กะทำงานของวันนี้</label>
+      <select class="modal-select" id="edit-att-shift"></select>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">ใช้กะนี้คำนวณการมาสาย — แก้ให้ตรงกับกะที่พนักงานทำงานจริงวันนั้น</div>
+    </div>
     <label class="modal-label">เหตุผลที่แก้ไข *</label>
     <textarea class="modal-textarea" id="edit-att-note" placeholder="ระบุเหตุผลที่แก้ไข..."></textarea>
     <button class="btn-primary" id="edit-att-save-btn" onclick="saveEditAttendance()">💾 บันทึกการแก้ไข</button>
@@ -1196,7 +1201,7 @@ let clockTick=null,gpsCached=null;
 let loginAuthType='pin';
 let pinSessionSecret='';
 // ลาครึ่งวัน: เปิดใช้เมื่อ apply migration 20260723090000 (days -> numeric) บน Supabase แล้วเท่านั้น
-const HALF_DAY_LEAVE_ENABLED=false;
+const HALF_DAY_LEAVE_ENABLED=true;
 const QUOTAS={sick:30,personal:6,vacation:6};
 const LLABELS={sick:'🏥 ลาป่วย',personal:'📋 ลากิจ',vacation:'🌴 ลาพักร้อน',unpaid:'💸 ลาหักเงิน'};
 const AV=[['#E8F5E9','#1B5E20'],['#E3F2FD','#0D47A1'],['#F3E5F5','#4A148C'],['#FFF8E1','#E65100'],['#FCE4EC','#880E4F']];
@@ -2128,7 +2133,7 @@ async function loadReport(){
     const clickAttr = canReviewPending
       ? `onclick="openAttendanceRequests('${pendingAttendanceChange.id}')" style="cursor:pointer"`
       : canEdit
-        ? `onclick="openEditAtt('${a?.id||''}','${e.id}','${empNameSafe}','${date}','${a?.check_in||''}','${a?.check_out||''}','${shift?.check_in_time?.substring(0,5)||''}','${shift?.check_out_time?.substring(0,5)||''}')" style="cursor:pointer"`
+        ? `onclick="openEditAtt('${a?.id||''}','${e.id}','${empNameSafe}','${date}','${a?.check_in||''}','${a?.check_out||''}','${shift?.check_in_time?.substring(0,5)||''}','${shift?.check_out_time?.substring(0,5)||''}','${(a?.shift_id||e.shift_id)||''}')" style="cursor:pointer"`
         : '';
     const editIcon = pendingAttendanceChange
       ? ` <span style="font-size:10px;color:var(--orange)">${canReviewPending?'⏳ เปิดคำขอแก้เวลา':'⏳ รอ Owner อนุมัติแก้เวลา'}</span>`
@@ -2153,7 +2158,7 @@ async function loadReport(){
 }
 
 // ========== EDIT ATTENDANCE (HR requests, Owner approves) ==========
-function openEditAtt(attId, employeeId, encodedEmpName, workDate, checkIn, checkOut, defaultCheckIn='', defaultCheckOut=''){
+function openEditAtt(attId, employeeId, encodedEmpName, workDate, checkIn, checkOut, defaultCheckIn='', defaultCheckOut='', shiftId=''){
   if(!['owner','hr'].includes(user.role)){toast('❌ สิทธิ์ HR หรือ Owner เท่านั้น','#E53935');return;}
   document.getElementById('edit-att-id').value = attId;
   document.getElementById('edit-att-employee-id').value = employeeId;
@@ -2165,6 +2170,13 @@ function openEditAtt(attId, employeeId, encodedEmpName, workDate, checkIn, check
   document.getElementById('edit-att-checkout').value = toHHMM(checkOut)||defaultCheckOut;
   document.getElementById('edit-att-note').value = '';
   const isHR=user.role==='hr';
+  // เลือกกะของ record (เฉพาะ Owner แก้ได้ — HR ยังแก้เฉพาะเวลา)
+  const shiftSel=document.getElementById('edit-att-shift');
+  if(shiftSel){
+    shiftSel.innerHTML=allShifts.map(s=>`<option value="${s.id}">${s.shift_name} (${s.check_in_time.substring(0,5)}–${s.check_out_time.substring(0,5)})</option>`).join('');
+    if(shiftId)shiftSel.value=shiftId;
+  }
+  document.getElementById('edit-att-shift-row').style.display = isHR?'none':'block';
   document.getElementById('edit-att-access-title').textContent=isHR?'👩‍💼 HR ส่งคำขอแก้ไขเวลา':'👑 Owner ยืนยันการแก้ไขได้ทันที';
   document.getElementById('edit-att-access-sub').textContent=isHR?'เวลาจริงจะยังไม่เปลี่ยน จนกว่า Owner จะอนุมัติขั้นสุดท้าย':'การแก้ไขโดย Owner จะบันทึกลงระบบทันที';
   document.getElementById('edit-att-save-btn').textContent=isHR?'📨 ส่งให้ Owner อนุมัติ':'💾 บันทึกและยืนยัน';
@@ -2192,6 +2204,7 @@ async function saveEditAttendance(){
   const workDate = document.getElementById('edit-att-date').value;
   const checkinStr = document.getElementById('edit-att-checkin').value.trim();
   const checkoutStr = document.getElementById('edit-att-checkout').value.trim();
+  const shiftId = document.getElementById('edit-att-shift')?.value||'';
   const note = document.getElementById('edit-att-note').value.trim();
   if(!checkinStr){toast('กรุณากรอกเวลาเข้างาน','#E53935');return;}
   if(!note){toast('กรุณาระบุเหตุผลที่แก้ไข','#E53935');return;}
@@ -2207,6 +2220,7 @@ async function saveEditAttendance(){
       work_date:workDate,
       check_in:checkinStr,
       check_out:checkoutStr||null,
+      shift_id:user.role==='owner'?(shiftId||null):undefined,
       reason:note
     });
     closeModal('modal-edit-att');
