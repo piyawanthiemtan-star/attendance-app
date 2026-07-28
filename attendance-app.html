@@ -2096,6 +2096,7 @@ async function loadReport(){
   const rows=emps.map((e,i)=>{
     const a=atts?.find(x=>x.employee_id===e.id);
     const l=leaves?.find(x=>x.employee_id===e.id);
+    const halfL=leaves?.find(x=>x.employee_id===e.id&&Number(x.days)===0.5);
     const pattern=workPatternForDate(workPatterns,e.id,date);
     const schedule=scheduleStateForDate(pattern,dayOffSwaps,e.id,date);
     const isWeeklyOff=schedule.isOff;
@@ -2104,7 +2105,11 @@ async function loadReport(){
     const shift=allShifts.find(x=>x.id===(a?.shift_id||e.shift_id));
     const br=allBranches.find(x=>x.id===a?.branch_id);
     let badge='ยังไม่มา',badgeCls='badge-absent',sub='--';
-    if(a?.check_in){
+    if(halfL){
+      // ลาครึ่งวัน — แสดงเป็นวันลา ไม่นับสาย (มาทำงานอีกครึ่งถ้ามีเช็คอิน)
+      onleave++;badge='ลาครึ่งวัน';badgeCls='badge-leave';
+      sub='ลาครึ่งวัน · '+(LLABELS[halfL.leave_type]||halfL.leave_type)+(a?.check_in?' · มาทำงานครึ่งวัน เข้า '+fmtT(a.check_in):'');
+    }else if(a?.check_in){
       present++;
       // คำนวณสายจากกะที่บันทึกในระเบียนวันนั้น (รองรับการเลือกกะรายวัน)
       const lm=e.attendance_required===false?0:attLateMin(a,e.shift_id);

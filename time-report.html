@@ -366,6 +366,7 @@ async function loadReport(){
       const dt=new Date(date+'T00:00:00');
       const att=empAtts.find(a=>a.work_date===date);
       const lv=empLeaves.find(l=>l.start_date<=date&&l.end_date>=date);
+      const halfLv=empLeaves.find(l=>l.start_date<=date&&l.end_date>=date&&Number(l.days)===0.5);
       const pattern=workPatternForDate(workPatterns,emp.id,date);
       const schedule=scheduleStateForDate(pattern,dayOffSwaps,emp.id,date);
       const isWeeklyOff=schedule.isOff;
@@ -374,7 +375,18 @@ async function loadReport(){
 
       let status='',cin='--',breakStart='--',breakEnd='--',cout='--',lateMins=0,otMins=0,note='',rowClass='',breakMins=null;
 
-      if(att?.check_in){
+      if(halfLv){
+        // ลาครึ่งวัน — แสดงเป็นวันลา ไม่นับสาย (มาทำงานอีกครึ่งถ้ามีเช็คอิน)
+        status='half_leave';empLeave+=0.5;totLeave+=0.5;
+        const halfTypeMap={sick:'ลาป่วย',personal:'ลากิจ',vacation:'ลาพักร้อน',unpaid:'ลาหักเงิน'};
+        note='ลาครึ่งวัน ('+(halfTypeMap[halfLv.leave_type]||halfLv.leave_type)+')';
+        if(att?.check_in){
+          empDays+=0.5;totDays+=0.5;
+          cin=fmtT(att.check_in);
+          cout=att.check_out?fmtT(att.check_out):'(ยังอยู่)';
+          note+=' · มาทำงานครึ่งวัน';
+        }
+      } else if(att?.check_in){
         empDays++;totDays++;
         cin=fmtT(att.check_in);
         breakStart=att.break_start?fmtT(att.break_start):'--';
@@ -420,7 +432,7 @@ async function loadReport(){
 
       const breakOver=breakMins!==null&&breakMins>BREAK_LIMIT_MINUTES;
 
-      const badgeMap={ok:'<span class="badge badge-ok">✅ ปกติ</span>',late:`<span class="badge badge-late">⚠️ สาย ${lateMins}น.</span>`,absent:'<span class="badge badge-absent">❌ ขาด</span>',leave:'<span class="badge badge-leave">📋 ลา</span>',holiday:'<span class="badge badge-holiday">วันหยุด</span>',pending_swap:'<span class="badge badge-pending">รออนุมัติสลับวันหยุด</span>',unscheduled:'<span class="badge badge-unscheduled">รอตั้งตาราง</span>',exempt:'<span class="badge badge-holiday">ยกเว้นลงเวลา</span>',not_applicable:'<span class="badge badge-holiday">—</span>',future:'<span class="badge badge-holiday">ยังไม่ถึงวัน</span>'};
+      const badgeMap={ok:'<span class="badge badge-ok">✅ ปกติ</span>',late:`<span class="badge badge-late">⚠️ สาย ${lateMins}น.</span>`,absent:'<span class="badge badge-absent">❌ ขาด</span>',leave:'<span class="badge badge-leave">📋 ลา</span>',half_leave:'<span class="badge badge-leave">📋 ลาครึ่งวัน</span>',holiday:'<span class="badge badge-holiday">วันหยุด</span>',pending_swap:'<span class="badge badge-pending">รออนุมัติสลับวันหยุด</span>',unscheduled:'<span class="badge badge-unscheduled">รอตั้งตาราง</span>',exempt:'<span class="badge badge-holiday">ยกเว้นลงเวลา</span>',not_applicable:'<span class="badge badge-holiday">—</span>',future:'<span class="badge badge-holiday">ยังไม่ถึงวัน</span>'};
 
       rows.push(`<tr class="${status==='absent'?'':''}">
         <td>${dt.getDate()}</td>
@@ -443,7 +455,7 @@ async function loadReport(){
         พัก_นาที:breakMins??'', เตือนพักเกิน:breakOver?'พักเกิน 60 นาที':'',
         เวลาออก:cout==='--'?'':cout,
         สาย_นาที:lateMins>5?lateMins:'', OT_ชม:otMins>0?(otMins/60).toFixed(1):'',
-        สถานะ:status==='ok'?'ปกติ':status==='late'?'สาย':status==='absent'?'ขาด':status==='leave'?'ลา':status==='holiday'?'หยุด':status==='pending_swap'?'รออนุมัติสลับวันหยุด':status==='unscheduled'?'รอตั้งตาราง':status==='exempt'?'ยกเว้นลงเวลา':status==='not_applicable'?'ไม่อยู่ในช่วงจ้าง':status==='future'?'ยังไม่ถึงวัน':'',
+        สถานะ:status==='ok'?'ปกติ':status==='late'?'สาย':status==='absent'?'ขาด':status==='leave'?'ลา':status==='half_leave'?'ลาครึ่งวัน':status==='holiday'?'หยุด':status==='pending_swap'?'รออนุมัติสลับวันหยุด':status==='unscheduled'?'รอตั้งตาราง':status==='exempt'?'ยกเว้นลงเวลา':status==='not_applicable'?'ไม่อยู่ในช่วงจ้าง':status==='future'?'ยังไม่ถึงวัน':'',
         หมายเหตุ:note
       });
     });
