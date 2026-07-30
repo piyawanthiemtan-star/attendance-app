@@ -537,8 +537,9 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
           <input class="modal-input" id="ann-title" placeholder="เช่น ประกาศเงินเดือนเดือนมิถุนายน">
           <label class="modal-label">รายละเอียด</label>
           <textarea class="modal-textarea" id="ann-desc" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
-          <label class="modal-label">แนบไฟล์ (PDF, รูปภาพ)</label>
+          <label class="modal-label">แนบไฟล์ (PDF, รูปภาพ) — สูงสุด 2 ไฟล์</label>
           <input type="file" id="ann-file" accept=".pdf,.jpg,.jpeg,.png" class="modal-input" style="padding:8px">
+          <input type="file" id="ann-file-2" accept=".pdf,.jpg,.jpeg,.png" class="modal-input" style="padding:8px;margin-top:6px">
           <div id="ann-upload-progress" style="display:none;font-size:12px;color:var(--teal);margin-top:6px">⏳ กำลังอัปโหลด...</div>
           <button class="btn-primary" onclick="submitAnnounce()">📢 โพสต์ประกาศ</button>
         </div>
@@ -1495,6 +1496,7 @@ async function initPinAttendanceApp(){
   document.querySelectorAll('.nav-item').forEach(el=>el.style.display='none');
   document.getElementById('nav-clock').style.display='flex';
   document.getElementById('nav-leave').style.display='flex';
+  document.getElementById('nav-announce').style.display='flex';
   document.getElementById('nav-profile').style.display='flex';
   document.getElementById('btn-open-leave').style.display='none';
   document.getElementById('pin-leave-readonly').style.display='block';
@@ -3457,15 +3459,22 @@ async function loadAnnouncements(){
   // แสดงปุ่มอัปโหลดเฉพาะ HR/Owner
   if(uploadSection) uploadSection.style.display = (user.role==='hr'||user.role==='owner') ? 'block' : 'none';
 
-  const{data,error}=await db.from('announcements').select('*,employees(name)').order('created_at',{ascending:false});
-  if(!data?.length){
+  // ประกาศเป็นข้อมูลสาธารณะการทำงาน → อ่านตรงได้ทุก role (RLS เปิด anon read)
+  const r=await db.from('announcements').select('*,employees(name)').order('created_at',{ascending:false});
+  const data=r.data||[], error=r.error;
+  if(error){
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">โหลดประกาศไม่สำเร็จ</div><div class="empty-sub">'+(error.message||'ลองใหม่อีกครั้ง')+'</div></div>';
+    return;
+  }
+  if(!data.length){
     el.innerHTML='<div class="empty-state"><div class="empty-icon">📢</div><div class="empty-text">ยังไม่มีประกาศ</div><div class="empty-sub">HR จะโพสต์ข่าวสารที่นี่</div></div>';
     return;
   }
   el.innerHTML = data.map(a=>{
     const canDelete = user.role==='hr'||user.role==='owner';
-    const fileBtn = a.file_url ? `<a href="${a.file_url}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;background:var(--teal-light);color:var(--teal2);font-size:12px;font-weight:600;text-decoration:none;margin-top:8px">📎 ${a.file_name||'ดูไฟล์แนบ'}</a>` : '';
-    const deleteBtn = canDelete ? `<button onclick="deleteAnnounce('${a.id}','${a.file_url||''}')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;background:var(--red-light)">🗑 ลบ</button>` : '';
+    const fileLink=(url,name,fallback)=>url?`<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;background:var(--teal-light);color:var(--teal2);font-size:12px;font-weight:600;text-decoration:none;margin-top:8px;margin-right:8px">📎 ${name||fallback}</a>`:'';
+    const fileBtn = fileLink(a.file_url,a.file_name,'ดูไฟล์แนบ')+fileLink(a.file_url_2,a.file_name_2,'ดูไฟล์แนบ 2');
+    const deleteBtn = canDelete ? `<button onclick="deleteAnnounce('${a.id}','${a.file_url||''}','${a.file_url_2||''}')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;background:var(--red-light)">🗑 ลบ</button>` : '';
     const date = new Date(a.created_at);
     const dateStr = date.getDate()+' '+ ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][date.getMonth()]+' '+(date.getFullYear()+543);
     return `<div class="card" style="margin-bottom:10px;border-left:4px solid var(--teal)">
@@ -3480,43 +3489,58 @@ async function loadAnnouncements(){
   }).join('');
 }
 
+async function uploadAnnounceFile(inputId){
+  const file=document.getElementById(inputId).files[0];
+  if(!file)return{url:null,name:null};
+  const ext=(file.name.split('.').pop()||'pdf').replace(/[^a-zA-Z0-9]/g,'')||'pdf';
+  const path=`announcements/${Date.now()}_${inputId}.${ext}`;
+  const{error:upErr}=await db.storage.from('announcements').upload(path,file);
+  if(upErr)throw new Error('อัปโหลดไฟล์ไม่สำเร็จ: '+upErr.message);
+  const{data:urlData}=db.storage.from('announcements').getPublicUrl(path);
+  return{url:urlData.publicUrl,name:file.name}; // เก็บชื่อไฟล์เดิม (ภาษาไทย) ไว้แสดงผล
+}
 async function submitAnnounce(){
   const title = document.getElementById('ann-title').value.trim();
   const desc = document.getElementById('ann-desc').value.trim();
-  const fileInput = document.getElementById('ann-file');
-  const file = fileInput.files[0];
   if(!title){toast('กรุณากรอกหัวข้อประกาศ','#E53935');return;}
 
-  let file_url=null, file_name=null;
-  if(file){
-    document.getElementById('ann-upload-progress').style.display='block';
-    const ext = file.name.split('.').pop();
-    const safeExt = ext.replace(/[^a-zA-Z0-9]/g,'') || 'pdf';
-    const path = `announcements/${Date.now()}.${safeExt}`;
-    const{data:upData,error:upErr}=await db.storage.from('announcements').upload(path, file);
-    if(upErr){toast('อัปโหลดไฟล์ไม่สำเร็จ: '+upErr.message,'#E53935');document.getElementById('ann-upload-progress').style.display='none';return;}
-    const{data:urlData}=db.storage.from('announcements').getPublicUrl(path);
-    file_url=urlData.publicUrl;
-    file_name=file.name; // เก็บชื่อไฟล์เดิม (ภาษาไทย) ไว้แสดงผลให้ผู้ใช้เห็น
+  let f1={url:null,name:null}, f2={url:null,name:null};
+  const hasFiles=document.getElementById('ann-file').files[0]||document.getElementById('ann-file-2').files[0];
+  if(hasFiles)document.getElementById('ann-upload-progress').style.display='block';
+  try{
+    f1=await uploadAnnounceFile('ann-file');
+    f2=await uploadAnnounceFile('ann-file-2');
+  }catch(e){
+    toast(e.message,'#E53935');
     document.getElementById('ann-upload-progress').style.display='none';
+    return;
   }
+  document.getElementById('ann-upload-progress').style.display='none';
 
-  const{error}=await db.from('announcements').insert({title,description:desc||null,file_url,file_name,created_by:user.id});
+  const{error}=await db.from('announcements').insert({
+    title, description:desc||null,
+    file_url:f1.url, file_name:f1.name,
+    file_url_2:f2.url, file_name_2:f2.name,
+    created_by:user.id
+  });
   if(error){toast('Error: '+error.message,'#E53935');return;}
 
   document.getElementById('ann-title').value='';
   document.getElementById('ann-desc').value='';
-  fileInput.value='';
+  document.getElementById('ann-file').value='';
+  document.getElementById('ann-file-2').value='';
   toast('📢 โพสต์ประกาศแล้ว','#0B9E82');
   loadAnnouncements();
 }
 
-async function deleteAnnounce(id, fileUrl){
+async function deleteAnnounce(id, fileUrl, fileUrl2){
   if(!confirm('ลบประกาศนี้?'))return;
-  // ลบไฟล์จาก storage ถ้ามี
-  if(fileUrl){
-    const path = fileUrl.split('/announcements/')[1];
-    if(path) await db.storage.from('announcements').remove([path]);
+  // ลบไฟล์จาก storage ถ้ามี (รองรับ 2 ไฟล์)
+  for(const u of [fileUrl,fileUrl2]){
+    if(u){
+      const path = u.split('/announcements/')[1];
+      if(path) await db.storage.from('announcements').remove([path]);
+    }
   }
   await db.from('announcements').delete().eq('id',id);
   toast('ลบประกาศแล้ว','#E53935');
