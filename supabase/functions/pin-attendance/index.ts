@@ -378,7 +378,7 @@ Deno.serve(async (req: Request) => {
         if (shift.check_in_time && attendance.check_in) {
           const [ih, im] = String(shift.check_in_time).split(":").map(Number);
           const shiftLen = (hour * 60 + minute) - (ih * 60 + im);
-          const OT_CAP_MIN = 21 * 60; // OT ตัดที่ 21:00 สำหรับทุกคน
+          const OT_CAP_MIN = 21 * 60 + 20; // OT ตัดที่ 21:20 (ร้านปิด 21:00 + เคลียร้าน 20 นาที)
           const worked = Math.min(minutesInBangkok(), OT_CAP_MIN) - minutesInBangkok(new Date(String(attendance.check_in)));
           const extra = worked - shiftLen;
           if (extra >= 40) otMinutes = extra;
