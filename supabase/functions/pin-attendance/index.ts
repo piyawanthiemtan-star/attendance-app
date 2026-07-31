@@ -306,9 +306,14 @@ Deno.serve(async (req: Request) => {
 
     const shiftId = isUuid(body.shift_id) ? body.shift_id : employee.shift_id;
     let validShiftId: string | null = null;
+    let lateMinutes = 0;
     if (isUuid(shiftId)) {
-      const { data: shift } = await admin.from("shifts").select("id").eq("id", shiftId).maybeSingle();
+      const { data: shift } = await admin.from("shifts").select("id, check_in_time").eq("id", shiftId).maybeSingle();
       validShiftId = shift?.id ?? null;
+      if (shift?.check_in_time) {
+        const [sh, sm] = String(shift.check_in_time).split(":").map(Number);
+        lateMinutes = Math.max(0, minutesInBangkok() - (sh * 60 + sm));
+      }
     }
     const note = typeof body.note === "string" ? body.note.trim().slice(0, 500) : "";
     const { data, error } = await admin.from("attendance").insert({
@@ -320,6 +325,8 @@ Deno.serve(async (req: Request) => {
       latitude,
       longitude,
       gps_verified: latitude !== null && longitude !== null,
+      is_late: lateMinutes > 5,
+      late_minutes: lateMinutes,
       note: note || null,
     }).select().single();
     if (error) return json(400, { error: "บันทึกเวลาเข้าไม่สำเร็จ" });
