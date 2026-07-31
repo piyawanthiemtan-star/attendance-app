@@ -514,11 +514,18 @@ async function loadSummary(){
     const empAtts=(atts||[]).filter(a=>a.employee_id===emp.id&&a.check_in);
     const workDays=empAtts.length;
     const unpaidDays=(leaves||[]).filter(l=>l.employee_id===emp.id&&l.leave_type==='unpaid').reduce((s,l)=>s+(l.days||0),0);
-    const proratedBase=Math.round((base-base/30*unpaidDays)*100)/100;
-    const posPay=cfg?.position_pay||0;
-    const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
-    const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
-    const otherPay=cfg?.other_pay||0;
+    // แบ่งจ่ายตามวันเริ่มงาน/ลาออกกลางเดือน (ตรงกับ calcAndSaveItems)
+    const daysInMonth=new Date(y,m,0).getDate();
+    const employedFrom=emp.start_date&&emp.start_date>start?emp.start_date:start;
+    const employedUntil=emp.resigned_at&&emp.resigned_at<end?emp.resigned_at:end;
+    const employedDays=Math.max(0,Math.round((new Date(employedUntil+'T00:00:00')-new Date(employedFrom+'T00:00:00'))/86400000)+1);
+    const employmentRatio=Math.min(1,employedDays/daysInMonth);
+    const prorate=v=>Math.round((Number(v||0)*employmentRatio)*100)/100;
+    const proratedBase=Math.max(0,Math.round((base*employmentRatio-base/30*unpaidDays)*100)/100);
+    const posPay=prorate(cfg?.position_pay);
+    const licensePay=cfg?.driving_license?prorate(cfg?.license_pay):0;
+    const comm=cfg?.commission_type==='fixed'?prorate(cfg?.commission_value):0;
+    const otherPay=prorate(cfg?.other_pay);
     const totalDeduct=(cfg?.other_deduct||0)+(cfg?.other_deduct2||0)+(cfg?.other_deduct3||0);
     const lateCount=(empAtts.filter(a=>a.is_late)||[]).length;
     const otMins=(otAtts||[]).filter(a=>a.employee_id===emp.id).reduce((s,a)=>s+(a.ot_minutes||0),0);
@@ -633,11 +640,18 @@ async function showPayslip(empId,ym){
   const base=cfg?.base_salary||0;
   const workDays=(atts||[]).filter(a=>a.check_in).length;
   const unpaidDays=(leaves||[]).filter(l=>l.leave_type==='unpaid').reduce((s,l)=>s+(l.days||0),0);
-  const proratedBase=Math.round((base-base/30*unpaidDays)*100)/100;
-  const posPay=cfg?.position_pay||0;
-  const licensePay=cfg?.driving_license?cfg?.license_pay||0:0;
-  const comm=cfg?.commission_type==='fixed'?cfg?.commission_value||0:0;
-  const otherPay=cfg?.other_pay||0;
+  // แบ่งจ่ายตามวันเริ่มงาน/ลาออกกลางเดือน (ตรงกับ calcAndSaveItems)
+  const daysInMonth=new Date(y,m,0).getDate();
+  const employedFrom=emp.start_date&&emp.start_date>start?emp.start_date:start;
+  const employedUntil=emp.resigned_at&&emp.resigned_at<end?emp.resigned_at:end;
+  const employedDays=Math.max(0,Math.round((new Date(employedUntil+'T00:00:00')-new Date(employedFrom+'T00:00:00'))/86400000)+1);
+  const employmentRatio=Math.min(1,employedDays/daysInMonth);
+  const prorate=v=>Math.round((Number(v||0)*employmentRatio)*100)/100;
+  const proratedBase=Math.max(0,Math.round((base*employmentRatio-base/30*unpaidDays)*100)/100);
+  const posPay=prorate(cfg?.position_pay);
+  const licensePay=cfg?.driving_license?prorate(cfg?.license_pay):0;
+  const comm=cfg?.commission_type==='fixed'?prorate(cfg?.commission_value):0;
+  const otherPay=prorate(cfg?.other_pay);
   const otherDesc=cfg?.other_desc||'เงินเพิ่มอื่นๆ';
   const d1=cfg?.other_deduct||0, d1n=cfg?.other_deduct_desc||'รายการหัก 1';
   const d2=cfg?.other_deduct2||0, d2n=cfg?.other_deduct2_desc||'รายการหัก 2';
