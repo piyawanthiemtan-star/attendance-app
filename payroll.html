@@ -509,12 +509,14 @@ async function loadSummary(){
   const wdCount=countWorkDays(new Date(start),new Date(end));
 
   let totalBase=0,totalOther=0,totalGross=0,totalNet=0,totalDed=0,totalOT=0;
-  const visibleEmps=(isOwner?allEmps:allEmps.filter(e=>e.id===currentUser?.id)).filter(e=>e.payroll_eligible!==false);
+  // เรียงตามเลขที่ใส่ไว้หน้าชื่อ (เช่น "1.นาย…") แบบตัวเลขจริง คนที่ไม่ใส่เลขไปอยู่ท้าย
+  const leadNum=n=>{const mm=String(n||'').match(/^\s*(\d+)/);return mm?parseInt(mm[1],10):999999;};
+  const visibleEmps=(isOwner?allEmps:allEmps.filter(e=>e.id===currentUser?.id)).filter(e=>e.payroll_eligible!==false).slice().sort((a,b)=>leadNum(a.name)-leadNum(b.name));
   const subList=(items,red)=>{
     const r=items.filter(x=>Number(x[1])).map(x=>`<div style="display:flex;justify-content:space-between;gap:8px"><span style="color:var(--text3)">${x[0]}</span><span${red?' style="color:var(--red)"':''}>${fmt(x[1])}</span></div>`);
     return r.length?r.join(''):'<span style="color:var(--text3)">–</span>';
   };
-  const rowsHtml=visibleEmps.map((emp,i)=>{
+  const rowsHtml=visibleEmps.map((emp)=>{
     const cfg=salaryConfigs.find(c=>c.employee_id===emp.id);
     const base=cfg?.base_salary||0;
     const unpaidDays=(leaves||[]).filter(l=>l.employee_id===emp.id&&l.leave_type==='unpaid').reduce((s,l)=>s+(l.days||0),0);
@@ -543,7 +545,6 @@ async function loadSummary(){
     if(isOwner){totalBase+=proratedBase;totalOther+=otherSum;totalGross+=gross;totalNet+=net;totalDed+=totalDeduct;totalOT+=otPay;}
     const canClick=isOwner||emp.id===currentUser?.id;
     return`<tr style="border-top:0.5px solid var(--border);vertical-align:top;text-align:right${canClick?';cursor:pointer':''}" ${canClick?`onclick="showPayslip('${emp.id}','${ym}')"`:''}>
-      <td style="text-align:center;padding:9px 4px;color:var(--text3)">${i+1}</td>
       <td style="text-align:left;padding:9px 8px">${emp.name}${partMonth?`<div style="font-size:10px;color:var(--orange)">แบ่งจ่าย ${employedDays}/${daysInMonth} วัน</div>`:''}</td>
       <td style="padding:9px 8px">${fmt(proratedBase)}</td>
       <td style="padding:9px 8px">${otPay?fmt(otPay):'<span style="color:var(--text3)">–</span>'}</td>
@@ -564,11 +565,11 @@ async function loadSummary(){
     document.getElementById('sum-grid').style.display='none';
   }
   document.getElementById('sum-emp-list').innerHTML=visibleEmps.length?`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;min-width:700px">
-    <colgroup><col style="width:6%"><col style="width:17%"><col style="width:11%"><col style="width:8%"><col style="width:17%"><col style="width:11%"><col style="width:17%"><col style="width:13%"></colgroup>
+    <colgroup><col style="width:20%"><col style="width:12%"><col style="width:9%"><col style="width:18%"><col style="width:12%"><col style="width:17%"><col style="width:12%"></colgroup>
     <thead><tr style="text-align:right;color:var(--text3);border-bottom:0.5px solid var(--border)">
-      <th style="text-align:center;padding:6px 4px;font-weight:600">#</th><th style="text-align:left;padding:6px 8px;font-weight:600">พนักงาน</th><th style="padding:6px 8px;font-weight:600">เงินเดือน</th><th style="padding:6px 8px;font-weight:600">OT</th><th style="padding:6px 8px;font-weight:600">รายรับอื่น</th><th style="padding:6px 8px;font-weight:600">รายรับรวม</th><th style="padding:6px 8px;font-weight:600">รายการหัก</th><th style="padding:6px 8px;font-weight:600">รับสุทธิ</th>
+      <th style="text-align:left;padding:6px 8px;font-weight:600">พนักงาน</th><th style="padding:6px 8px;font-weight:600">เงินเดือน</th><th style="padding:6px 8px;font-weight:600">OT</th><th style="padding:6px 8px;font-weight:600">รายรับอื่น</th><th style="padding:6px 8px;font-weight:600">รายรับรวม</th><th style="padding:6px 8px;font-weight:600">รายการหัก</th><th style="padding:6px 8px;font-weight:600">รับสุทธิ</th>
     </tr></thead><tbody>${rowsHtml}</tbody>${isOwner?`<tfoot><tr style="border-top:1px solid var(--text3);font-weight:600;text-align:right">
-      <td></td><td style="text-align:left;padding:9px 8px">รวมทั้งหมด</td><td style="padding:9px 8px">${fmt(totalBase)}</td><td style="padding:9px 8px">${fmt(totalOT)}</td><td style="padding:9px 8px">${fmt(totalOther)}</td><td style="padding:9px 8px">${fmt(totalGross)}</td><td style="padding:9px 8px;color:var(--red)">${fmt(totalDed)}</td><td style="padding:9px 8px;color:var(--teal2)">฿${fmt(totalNet)}</td>
+      <td style="text-align:left;padding:9px 8px">รวมทั้งหมด</td><td style="padding:9px 8px">${fmt(totalBase)}</td><td style="padding:9px 8px">${fmt(totalOT)}</td><td style="padding:9px 8px">${fmt(totalOther)}</td><td style="padding:9px 8px">${fmt(totalGross)}</td><td style="padding:9px 8px;color:var(--red)">${fmt(totalDed)}</td><td style="padding:9px 8px;color:var(--teal2)">฿${fmt(totalNet)}</td>
     </tr></tfoot>`:''}</table></div>`:'<div class="loading-text">ไม่มีข้อมูล</div>';
 }
 
