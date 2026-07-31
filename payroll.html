@@ -621,10 +621,13 @@ async function showPayslip(empId,ym){
   // รอบ OT = 21 เดือนก่อน - 20 เดือนนี้ (ตรงกับ createRun) — OT ต้องคิดตามรอบนี้ ไม่ใช่เดือนปฏิทิน
   const prevM=parseInt(m)-1||12; const prevY=prevM===12?parseInt(y)-1:y;
   const otStart=`${prevY}-${String(prevM).padStart(2,'0')}-21`; const otEnd=`${y}-${m}-20`;
-  const[{data:atts},{data:leaves},{data:otAtts}]=await Promise.all([
+  const[{data:atts},{data:leaves},{data:otAtts},{data:advItems}]=await Promise.all([
     db.from('attendance').select('*').eq('employee_id',empId).gte('work_date',start).lte('work_date',end),
     db.from('leave_requests').select('*').eq('employee_id',empId).eq('status','approved').gte('start_date',start).lte('end_date',end),
-    db.from('attendance').select('ot_minutes').eq('employee_id',empId).gte('work_date',otStart).lte('work_date',otEnd)
+    db.from('attendance').select('ot_minutes').eq('employee_id',empId).gte('work_date',otStart).lte('work_date',otEnd),
+    db.from('payroll_items').select('advance_principal_paid,payroll_runs!inner(year_month,run_type,status)')
+      .eq('employee_id',empId).eq('payroll_runs.year_month',ym).eq('payroll_runs.run_type','advance')
+      .in('payroll_runs.status',['confirmed','paid']).eq('payment_status','paid')
   ]);
 
   const base=cfg?.base_salary||0;
@@ -639,7 +642,8 @@ async function showPayslip(empId,ym){
   const d1=cfg?.other_deduct||0, d1n=cfg?.other_deduct_desc||'รายการหัก 1';
   const d2=cfg?.other_deduct2||0, d2n=cfg?.other_deduct2_desc||'รายการหัก 2';
   const d3=cfg?.other_deduct3||0, d3n=cfg?.other_deduct3_desc||'รายการหัก 3';
-  const totalDeduct=d1+d2+d3;
+  const advancePaid=(advItems||[]).reduce((s,it)=>s+Number(it.advance_principal_paid||0),0);
+  const totalDeduct=d1+d2+d3+advancePaid;
   const otMins=(otAtts||[]).reduce((s,a)=>s+(a.ot_minutes||0),0);
   const otPay=Math.round(otMins/60*base/30/8*1.5*100)/100;
   const gross=proratedBase+posPay+licensePay+comm+otherPay+otPay;
@@ -662,6 +666,7 @@ async function showPayslip(empId,ym){
       ${d1?`<tr><td>${d1n}</td><td>(฿${fmt(d1)})</td></tr>`:''}
       ${d2?`<tr><td>${d2n}</td><td>(฿${fmt(d2)})</td></tr>`:''}
       ${d3?`<tr><td>${d3n}</td><td>(฿${fmt(d3)})</td></tr>`:''}
+      ${advancePaid?`<tr><td>หักเงินเบิกล่วงหน้า (รอบ 15)</td><td>(฿${fmt(advancePaid)})</td></tr>`:''}
       <tr class="total-row"><td>รวมรายหัก</td><td>(฿${fmt(totalDeduct)})</td></tr>
       <tr class="net-row"><td>💵 รับสุทธิ</td><td>฿${fmt(net)}</td></tr>
     </table>
