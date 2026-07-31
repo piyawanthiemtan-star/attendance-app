@@ -366,14 +366,14 @@ Deno.serve(async (req: Request) => {
         if (earlyCheckout && body.early_checkout_confirmed !== true) {
           return json(409, { error: `ยังไม่ถึงเวลาเลิกงาน ${String(shift.check_out_time).slice(0, 5)} น. กรุณายืนยันอีกครั้ง` });
         }
-        if (difference >= 40) {
-          // OT สุทธิ = OT ดิบ - นาทีสาย (มาสายหักออกจาก OT, ไม่ต่ำกว่า 0)
-          let lateMinutes = 0;
-          if (shift.check_in_time && attendance.check_in) {
-            const [ih, im] = String(shift.check_in_time).split(":").map(Number);
-            lateMinutes = Math.max(0, minutesInBangkok(new Date(String(attendance.check_in))) - (ih * 60 + im));
-          }
-          otMinutes = Math.max(0, difference - lateMinutes);
+        // OT = เวลาทำงานจริง (ออก-เข้า) - ความยาวกะ (เลิก-เริ่ม) นับ >= 40 นาที
+        // มาเช้าแทนคนก็ได้ OT / มาสายก็ถูกหักในตัว
+        if (shift.check_in_time && attendance.check_in) {
+          const [ih, im] = String(shift.check_in_time).split(":").map(Number);
+          const shiftLen = (hour * 60 + minute) - (ih * 60 + im);
+          const worked = Math.round((Date.now() - new Date(String(attendance.check_in)).getTime()) / 60000);
+          const extra = worked - shiftLen;
+          if (extra >= 40) otMinutes = extra;
         }
       }
     }

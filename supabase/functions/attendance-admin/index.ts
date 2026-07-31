@@ -200,10 +200,13 @@ Deno.serve(async (req: Request) => {
       if (shift?.check_in_time) {
         lateMinutes = Math.max(0, timeToMinutes(checkIn) - timeToMinutes(String(shift.check_in_time).slice(0, 5)));
       }
-      if (checkOut && shift?.check_out_time) {
-        const difference = timeToMinutes(checkOut) - timeToMinutes(String(shift.check_out_time).slice(0, 5));
-        // OT สุทธิ = OT ดิบ - นาทีสาย (มาสายหักออกจาก OT, ไม่ต่ำกว่า 0)
-        if (difference >= 40) otMinutes = Math.max(0, difference - lateMinutes);
+      if (checkOut && shift?.check_out_time && shift?.check_in_time) {
+        // OT = เวลาทำงานจริง (ออก-เข้า) - ความยาวกะ (เลิก-เริ่ม) นับ >= 40 นาที
+        // มาเช้าแทนคนก็ได้ OT / มาสายก็ถูกหักในตัว
+        const worked = timeToMinutes(checkOut) - timeToMinutes(checkIn);
+        const shiftLen = timeToMinutes(String(shift.check_out_time).slice(0, 5)) - timeToMinutes(String(shift.check_in_time).slice(0, 5));
+        const extra = worked - shiftLen;
+        if (extra >= 40) otMinutes = extra;
       }
     }
 
