@@ -121,6 +121,7 @@ table.ps tr.net-row td{background:var(--teal);color:#fff;font-weight:800;font-si
 <div class="content" id="page-summary">
   <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap">
     <label class="fl">เดือน<input type="month" class="fi" id="sum-month" onchange="loadSummary()"></label>
+    <button class="btn btn-teal" onclick="printAllPayslips()" style="align-self:center">🧾 พิมพ์สลิปทุกคน</button>
   </div>
   <div class="sum-grid" id="sum-grid">
     <div class="sum-box"><div class="sum-num" id="sg-emp" style="color:var(--teal)">–</div><div class="sum-lbl">พนักงาน</div></div>
@@ -700,6 +701,87 @@ async function showPayslip(empId,ym){
     </div>`;
   openModal('modal-payslip');
 }
+
+async function printAllPayslips(){
+  const ym=document.getElementById('sum-month').value;
+  if(!ym){alert('กรุณาเลือกเดือนก่อน');return;}
+  const[y,m]=ym.split('-');
+  const start=`${y}-${m}-01`;const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
+  const prevM=parseInt(m)-1||12;const prevY=prevM===12?parseInt(y)-1:y;
+  const otStart=`${prevY}-${String(prevM).padStart(2,'0')}-21`;const otEnd=`${y}-${m}-20`;
+  const[{data:atts},{data:leaves},{data:otAtts},{data:advItems}]=await Promise.all([
+    db.from('attendance').select('employee_id,check_in,is_late').gte('work_date',start).lte('work_date',end),
+    db.from('leave_requests').select('employee_id,leave_type,days').eq('status','approved').lte('start_date',end).gte('end_date',start),
+    db.from('attendance').select('employee_id,ot_minutes').gte('work_date',otStart).lte('work_date',otEnd),
+    db.from('payroll_items').select('employee_id,advance_principal_paid,payroll_runs!inner(year_month,run_type,status)').eq('payroll_runs.year_month',ym).eq('payroll_runs.run_type','advance').in('payroll_runs.status',['confirmed','paid']).eq('payment_status','paid')
+  ]);
+  const leadNum=n=>{const mm=String(n||'').match(/^\s*(\d+)/);return mm?parseInt(mm[1],10):999999;};
+  const emps=allEmps.filter(e=>e.payroll_eligible!==false).slice().sort((a,b)=>leadNum(a.name)-leadNum(b.name));
+  const f=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const daysInMonth=new Date(y,m,0).getDate();
+  const row=(label,val,neg)=>Number(val)?`<tr><td>${escapeHtmlPs(label)}</td><td style="text-align:right${neg?';color:#c00':''}">${neg?'(':''}฿${f(val)}${neg?')':''}</td></tr>`:'';
+  const slips=emps.map(emp=>{
+    const cfg=salaryConfigs.find(c=>c.employee_id===emp.id);
+    const base=cfg?.base_salary||0;
+    const empAtts=(atts||[]).filter(a=>a.employee_id===emp.id&&a.check_in);
+    const workDays=empAtts.length;const lateCount=empAtts.filter(a=>a.is_late).length;
+    const unpaidDays=(leaves||[]).filter(l=>l.employee_id===emp.id&&l.leave_type==='unpaid').reduce((s,l)=>s+(l.days||0),0);
+    const employedFrom=emp.start_date&&emp.start_date>start?emp.start_date:start;
+    const employedUntil=emp.resigned_at&&emp.resigned_at<end?emp.resigned_at:end;
+    const employedDays=Math.max(0,Math.round((new Date(employedUntil+'T00:00:00')-new Date(employedFrom+'T00:00:00'))/86400000)+1);
+    const ratio=Math.min(1,employedDays/daysInMonth);
+    const prorate=v=>Math.round((Number(v||0)*ratio)*100)/100;
+    const proratedBase=Math.max(0,Math.round((base*ratio-base/30*unpaidDays)*100)/100);
+    const posPay=prorate(cfg?.position_pay),licensePay=cfg?.driving_license?prorate(cfg?.license_pay):0,comm=cfg?.commission_type==='fixed'?prorate(cfg?.commission_value):0,otherPay=prorate(cfg?.other_pay);
+    const otMins=(otAtts||[]).filter(a=>a.employee_id===emp.id).reduce((s,a)=>s+(a.ot_minutes||0),0);
+    const otPay=Math.round(otMins/60*base/30/8*1.5*100)/100;
+    const advancePaid=(advItems||[]).filter(it=>it.employee_id===emp.id).reduce((s,it)=>s+Number(it.advance_principal_paid||0),0);
+    const d1=cfg?.other_deduct||0,d1n=cfg?.other_deduct_desc||'รายการหัก 1';
+    const d2=cfg?.other_deduct2||0,d2n=cfg?.other_deduct2_desc||'รายการหัก 2';
+    const d3=cfg?.other_deduct3||0,d3n=cfg?.other_deduct3_desc||'รายการหัก 3';
+    const totalDeduct=d1+d2+d3+advancePaid;
+    const gross=proratedBase+posPay+licensePay+comm+otherPay+otPay;
+    const net=gross-totalDeduct;
+    return `<div class="sheet">
+      <div class="brand">LOEI SMART GROUP</div>
+      <div class="title">สลิปเงินเดือน · ${escapeHtmlPs(emp.name)} · ${thaiM(ym)}</div>
+      <div class="meta">มาทำงาน ${workDays} วัน · สาย ${lateCount} ครั้ง${ratio<1?` · แบ่งจ่าย ${employedDays}/${daysInMonth} วัน`:''}</div>
+      <table>
+        <tr class="sec"><td colspan="2">รายรับ</td></tr>
+        ${row('เงินเดือน'+(unpaidDays?` (หักลา ${unpaidDays} วัน)`:''),proratedBase)}
+        ${row('ค่าตำแหน่ง',posPay)}${row('สวัสดิการใบขับขี่',licensePay)}${row('ค่าคอมมิชชั่น',comm)}${row(cfg?.other_desc||'เงินเพิ่มอื่น',otherPay)}
+        ${row(`ค่า OT (${(otMins/60).toFixed(1)} ชม.)`,otPay)}
+        <tr class="tot"><td>รวมรายรับ</td><td style="text-align:right">฿${f(gross)}</td></tr>
+        <tr class="sec"><td colspan="2">รายหัก</td></tr>
+        ${row(d1n,d1,true)}${row(d2n,d2,true)}${row(d3n,d3,true)}${row('หักเงินเบิกล่วงหน้า (รอบ 15)',advancePaid,true)}
+        ${totalDeduct?`<tr class="tot"><td>รวมรายหัก</td><td style="text-align:right;color:#c00">(฿${f(totalDeduct)})</td></tr>`:''}
+        <tr class="net"><td>รับสุทธิ</td><td style="text-align:right">฿${f(net)}</td></tr>
+      </table>
+      <div class="sign"><div>ผู้จ่าย ..............................</div><div>ผู้รับ ..............................</div></div>
+    </div>`;
+  }).join('');
+  const win=window.open('','_blank','width=820,height=920');
+  if(!win){alert('กรุณาอนุญาต popup เพื่อพิมพ์');return;}
+  win.document.write(`<!doctype html><html lang="th"><head><meta charset="UTF-8"><title>สลิปเงินเดือน ${thaiM(ym)}</title>
+    <style>
+      body{margin:0;font-family:'Noto Sans Thai',Arial,sans-serif;font-size:13px;color:#1A1A2E;background:#f5f6fa}
+      .sheet{width:min(720px,100%);margin:20px auto;background:#fff;padding:26px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);page-break-after:always}
+      .brand{font-size:18px;font-weight:800;color:#0D7A65}
+      .title{font-size:14px;font-weight:700;margin:2px 0 4px}
+      .meta{font-size:11px;color:#8A8AAA;margin-bottom:14px}
+      table{width:100%;border-collapse:collapse;font-size:12.5px}
+      td{padding:5px 4px;border-bottom:1px solid #eee}
+      .sec td{font-weight:700;color:#0D7A65;border-bottom:1px solid #0D7A65;padding-top:10px}
+      .tot td{font-weight:700}
+      .net td{font-weight:800;font-size:15px;color:#0D7A65;border-top:2px solid #0D7A65;border-bottom:none;padding-top:8px}
+      .sign{display:flex;justify-content:space-between;margin-top:30px;font-size:12px;color:#4A4A6A}
+      @media print{body{background:#fff}.sheet{width:100%;margin:0;box-shadow:none;border-radius:0}.bar{display:none}@page{size:A4;margin:12mm}}
+    </style></head><body>${slips||'<div class="sheet">ไม่มีข้อมูลพนักงาน</div>'}
+    <div class="bar" style="position:sticky;bottom:0;background:#fff;border-top:1px solid #ddd;padding:12px;text-align:center"><button onclick="window.print()" style="padding:10px 20px;border:none;border-radius:8px;background:#0B9E82;color:#fff;font-weight:700;cursor:pointer">พิมพ์ / บันทึก PDF ทุกคน</button></div>
+    </body></html>`);
+  win.document.close();
+}
+function escapeHtmlPs(s){return String(s||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 
 // ──────────── RUNS ────────────
 function loadRuns(){
