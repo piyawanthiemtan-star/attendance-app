@@ -78,6 +78,43 @@ const minutesInBangkok = (date = new Date()) => {
   return hour * 60 + minute;
 };
 
+// สรุปการมาสายของพนักงานในเดือนปัจจุบัน (ให้ PIN เห็นในหน้าโปรไฟล์) — สาย = เข้าเกินเวลากะ > 5 นาที
+// deno-lint-ignore no-explicit-any
+const buildMonthlySummary = async (admin: any, employee: any, shifts: any[]) => {
+  const today = bangkokDate(); // YYYY-MM-DD ตามเวลาไทย
+  const [yStr, mStr] = today.split("-");
+  const lastDay = new Date(Date.UTC(Number(yStr), Number(mStr), 0)).getUTCDate();
+  const monthStart = `${yStr}-${mStr}-01`;
+  const monthEnd = `${yStr}-${mStr}-${String(lastDay).padStart(2, "0")}`;
+  const [attRes, leaveRes] = await Promise.all([
+    admin.from("attendance").select("check_in, shift_id, work_date")
+      .eq("employee_id", employee.id).gte("work_date", monthStart).lte("work_date", monthEnd),
+    admin.from("leave_requests").select("days")
+      .eq("employee_id", employee.id).eq("status", "approved")
+      .gte("start_date", monthStart).lte("end_date", monthEnd),
+  ]);
+  const shiftStart = new Map((shifts || []).map((s) => [s.id, s.check_in_time]));
+  const required = employee.attendance_required !== false;
+  let present = 0;
+  let late = 0;
+  const lateDates: Array<{ date: string; minutes: number }> = [];
+  for (const a of attRes.data || []) {
+    if (!a.check_in) continue;
+    present++;
+    if (!required) continue;
+    const st = shiftStart.get(a.shift_id || employee.shift_id);
+    if (!st) continue;
+    const [sh, sm] = String(st).split(":").map(Number);
+    const lm = minutesInBangkok(new Date(String(a.check_in))) - (sh * 60 + sm);
+    if (lm > 5) {
+      late++;
+      lateDates.push({ date: a.work_date, minutes: lm });
+    }
+  }
+  const leaveDays = (leaveRes.data || []).reduce((sum: number, l: { days?: number }) => sum + Number(l.days || 0), 0);
+  return { month: `${yStr}-${mStr}`, present, late, leaveDays, qualified: required && late === 0 && leaveDays === 0, lateDates };
+};
+
 const distanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const radians = (degrees: number) => degrees * Math.PI / 180;
   const dLat = radians(lat2 - lat1);
@@ -213,11 +250,13 @@ Deno.serve(async (req: Request) => {
       admin.from("shifts").select("*").order("shift_name"),
       admin.from("branches").select("*").eq("active", true).order("name"),
     ]);
+    const summary = await buildMonthlySummary(admin, employee, shiftsResult.data ?? []);
     return json(200, {
       employee: safeEmployee(employee),
       attendance,
       shifts: shiftsResult.data ?? [],
       branches: branchesResult.data ?? [],
+      summary,
     });
   }
 
