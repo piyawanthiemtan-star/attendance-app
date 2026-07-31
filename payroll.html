@@ -495,24 +495,28 @@ async function loadSummary(){
   // รอบ OT = 21 เดือนก่อน - 20 เดือนนี้ (ตรงกับ createRun) — OT คิดตามรอบนี้ ไม่ใช่เดือนปฏิทิน
   const prevM=parseInt(m)-1||12; const prevY=prevM===12?parseInt(y)-1:y;
   const otStart=`${prevY}-${String(prevM).padStart(2,'0')}-21`; const otEnd=`${y}-${m}-20`;
-  const[{data:atts},{data:leaves},{data:payItems},{data:otAtts}]=await Promise.all([
+  const[{data:atts},{data:leaves},{data:payItems},{data:otAtts},{data:advItems}]=await Promise.all([
     db.from('attendance').select('*').gte('work_date',start).lte('work_date',end),
     db.from('leave_requests').select('*').eq('status','approved').gte('start_date',start).lte('end_date',end),
     db.from('payroll_items').select('*,payroll_runs!inner(year_month)').eq('payroll_runs.year_month',ym),
-    db.from('attendance').select('employee_id,ot_minutes').gte('work_date',otStart).lte('work_date',otEnd)
+    db.from('attendance').select('employee_id,ot_minutes').gte('work_date',otStart).lte('work_date',otEnd),
+    db.from('payroll_items').select('employee_id,advance_principal_paid,payroll_runs!inner(year_month,run_type,status)')
+      .eq('payroll_runs.year_month',ym).eq('payroll_runs.run_type','advance')
+      .in('payroll_runs.status',['confirmed','paid']).eq('payment_status','paid')
   ]);
 
   // วันทำงานในเดือน (จ-ศ)
   const wdCount=countWorkDays(new Date(start),new Date(end));
 
-  let totalGross=0,totalNet=0,totalDed=0,totalOT=0;
-  // ถ้าไม่ใช่ owner แสดงเฉพาะพนักงานตัวเอง
+  let totalBase=0,totalOther=0,totalGross=0,totalNet=0,totalDed=0,totalOT=0;
   const visibleEmps=(isOwner?allEmps:allEmps.filter(e=>e.id===currentUser?.id)).filter(e=>e.payroll_eligible!==false);
-  const html=visibleEmps.map((emp,i)=>{
+  const subList=(items,red)=>{
+    const r=items.filter(x=>Number(x[1])).map(x=>`<div style="display:flex;justify-content:space-between;gap:8px"><span style="color:var(--text3)">${x[0]}</span><span${red?' style="color:var(--red)"':''}>${fmt(x[1])}</span></div>`);
+    return r.length?r.join(''):'<span style="color:var(--text3)">–</span>';
+  };
+  const rowsHtml=visibleEmps.map((emp)=>{
     const cfg=salaryConfigs.find(c=>c.employee_id===emp.id);
     const base=cfg?.base_salary||0;
-    const empAtts=(atts||[]).filter(a=>a.employee_id===emp.id&&a.check_in);
-    const workDays=empAtts.length;
     const unpaidDays=(leaves||[]).filter(l=>l.employee_id===emp.id&&l.leave_type==='unpaid').reduce((s,l)=>s+(l.days||0),0);
     // แบ่งจ่ายตามวันเริ่มงาน/ลาออกกลางเดือน (ตรงกับ calcAndSaveItems)
     const daysInMonth=new Date(y,m,0).getDate();
@@ -520,33 +524,33 @@ async function loadSummary(){
     const employedUntil=emp.resigned_at&&emp.resigned_at<end?emp.resigned_at:end;
     const employedDays=Math.max(0,Math.round((new Date(employedUntil+'T00:00:00')-new Date(employedFrom+'T00:00:00'))/86400000)+1);
     const employmentRatio=Math.min(1,employedDays/daysInMonth);
+    const partMonth=employmentRatio<1;
     const prorate=v=>Math.round((Number(v||0)*employmentRatio)*100)/100;
     const proratedBase=Math.max(0,Math.round((base*employmentRatio-base/30*unpaidDays)*100)/100);
     const posPay=prorate(cfg?.position_pay);
     const licensePay=cfg?.driving_license?prorate(cfg?.license_pay):0;
     const comm=cfg?.commission_type==='fixed'?prorate(cfg?.commission_value):0;
     const otherPay=prorate(cfg?.other_pay);
-    const totalDeduct=(cfg?.other_deduct||0)+(cfg?.other_deduct2||0)+(cfg?.other_deduct3||0);
-    const lateCount=(empAtts.filter(a=>a.is_late)||[]).length;
     const otMins=(otAtts||[]).filter(a=>a.employee_id===emp.id).reduce((s,a)=>s+(a.ot_minutes||0),0);
     const otPay=Math.round(otMins/60*base/30/8*1.5*100)/100;
-    const gross=proratedBase+posPay+licensePay+comm+otherPay+otPay;
+    const advancePaid=(advItems||[]).filter(it=>it.employee_id===emp.id).reduce((s,it)=>s+Number(it.advance_principal_paid||0),0);
+    const otherItems=[['ค่าตำแหน่ง',posPay],['สวัสดิการใบขับขี่',licensePay],['ค่าคอมมิชชั่น',comm],[cfg?.other_desc||'เงินเพิ่มอื่น',otherPay]];
+    const deductItems=[[cfg?.other_deduct_desc||'รายการหัก 1',cfg?.other_deduct||0],[cfg?.other_deduct2_desc||'รายการหัก 2',cfg?.other_deduct2||0],[cfg?.other_deduct3_desc||'รายการหัก 3',cfg?.other_deduct3||0],['เงินเบิกล่วงหน้า',advancePaid]];
+    const otherSum=posPay+licensePay+comm+otherPay;
+    const totalDeduct=(cfg?.other_deduct||0)+(cfg?.other_deduct2||0)+(cfg?.other_deduct3||0)+advancePaid;
+    const gross=proratedBase+otherSum+otPay;
     const net=gross-totalDeduct;
-    if(isOwner){totalGross+=gross;totalNet+=net;totalDed+=totalDeduct;totalOT+=otPay;}
-    const[bg,tx]=AV[i%5];
-    // ถ้าไม่ใช่ owner ซ่อนตัวเลขในรายการรวม แต่คลิกดูสลิปตัวเองได้
+    if(isOwner){totalBase+=proratedBase;totalOther+=otherSum;totalGross+=gross;totalNet+=net;totalDed+=totalDeduct;totalOT+=otPay;}
     const canClick=isOwner||emp.id===currentUser?.id;
-    return`<div class="emp-row" ${canClick?`onclick="showPayslip('${emp.id}','${ym}')"`:''} style="${canClick?'':'cursor:default'}">
-      <div class="av" style="background:${bg};color:${tx}">${emp.name.substring(0,2)}</div>
-      <div>
-        <div class="emp-name">${emp.name}</div>
-        <div class="emp-sub">มา ${workDays} วัน · สาย ${lateCount} ครั้ง${isOwner?` · ฐาน ฿${fmt(base)}`:''}</div>
-      </div>
-      <div style="text-align:right">
-        <div class="salary-val">${isOwner?`฿${fmt(net)}`:(emp.id===currentUser?.id?`฿${fmt(net)}`:'🔒')}</div>
-        <div style="font-size:10px;color:var(--text3)">${isOwner||emp.id===currentUser?.id?'สุทธิ':''}</div>
-      </div>
-    </div>`;
+    return`<tr style="border-top:0.5px solid var(--border);vertical-align:top;text-align:right${canClick?';cursor:pointer':''}" ${canClick?`onclick="showPayslip('${emp.id}','${ym}')"`:''}>
+      <td style="text-align:left;padding:9px 8px">${emp.name}${partMonth?`<div style="font-size:10px;color:var(--orange)">แบ่งจ่าย ${employedDays}/${daysInMonth} วัน</div>`:''}</td>
+      <td style="padding:9px 8px">${fmt(proratedBase)}</td>
+      <td style="padding:9px 8px">${otPay?fmt(otPay):'<span style="color:var(--text3)">–</span>'}</td>
+      <td style="padding:9px 8px;text-align:left">${subList(otherItems)}</td>
+      <td style="padding:9px 8px;font-weight:600">${fmt(gross)}</td>
+      <td style="padding:9px 8px;text-align:left">${subList(deductItems,true)}</td>
+      <td style="padding:9px 8px;font-weight:600;color:var(--teal2)">฿${fmt(net)}</td>
+    </tr>`;
   }).join('');
 
   if(isOwner){
@@ -556,10 +560,15 @@ async function loadSummary(){
     document.getElementById('sg-ss').textContent='฿'+fmt(totalDed);
     document.getElementById('sg-ot').textContent='฿'+fmt(totalOT);
   } else {
-    // พนักงานเห็นแค่ชื่อตัวเองในรายการ ไม่เห็นยอดรวม
     document.getElementById('sum-grid').style.display='none';
   }
-  document.getElementById('sum-emp-list').innerHTML=html||'<div class="loading-text">ไม่มีข้อมูล</div>';
+  document.getElementById('sum-emp-list').innerHTML=visibleEmps.length?`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed;min-width:660px">
+    <colgroup><col style="width:19%"><col style="width:12%"><col style="width:9%"><col style="width:18%"><col style="width:12%"><col style="width:17%"><col style="width:13%"></colgroup>
+    <thead><tr style="text-align:right;color:var(--text3);border-bottom:0.5px solid var(--border)">
+      <th style="text-align:left;padding:6px 8px;font-weight:600">พนักงาน</th><th style="padding:6px 8px;font-weight:600">เงินเดือน</th><th style="padding:6px 8px;font-weight:600">OT</th><th style="padding:6px 8px;font-weight:600">รายรับอื่น</th><th style="padding:6px 8px;font-weight:600">รายรับรวม</th><th style="padding:6px 8px;font-weight:600">รายการหัก</th><th style="padding:6px 8px;font-weight:600">รับสุทธิ</th>
+    </tr></thead><tbody>${rowsHtml}</tbody>${isOwner?`<tfoot><tr style="border-top:1px solid var(--text3);font-weight:600;text-align:right">
+      <td style="text-align:left;padding:9px 8px">รวมทั้งหมด</td><td style="padding:9px 8px">${fmt(totalBase)}</td><td style="padding:9px 8px">${fmt(totalOT)}</td><td style="padding:9px 8px">${fmt(totalOther)}</td><td style="padding:9px 8px">${fmt(totalGross)}</td><td style="padding:9px 8px;color:var(--red)">${fmt(totalDed)}</td><td style="padding:9px 8px;color:var(--teal2)">฿${fmt(totalNet)}</td>
+    </tr></tfoot>`:''}</table></div>`:'<div class="loading-text">ไม่มีข้อมูล</div>';
 }
 
 function countWorkDays(start,end){
