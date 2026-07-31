@@ -203,7 +203,13 @@ Deno.serve(async (req: Request) => {
       if (checkOut && shift?.check_out_time && shift?.check_in_time) {
         // OT = เวลาทำงานจริง (ออก-เข้า) - ความยาวกะ (เลิก-เริ่ม) นับ >= 40 นาที
         // มาเช้าแทนคนก็ได้ OT / มาสายก็ถูกหักในตัว
-        const OT_CAP_MIN = 21 * 60 + 20; // OT ตัดที่ 21:20 (ร้านปิด 21:00 + เคลียร้าน 20 นาที)
+        // OT cap = เวลาปิดของสาขา + 20 นาทีเคลียร้าน (ฝนปิดเพ็ทช็อป 21:00, คนอื่น 20:00)
+        const OT_CAP_MIN =
+          (branchId === "dc38e18a-d7d3-40b5-96aa-d53d1e602c35" && employee.id === "102bf977-3554-423f-b481-88e084c53dbb") ? 21 * 60 + 20 // เพ็ทช็อป-ฝน: ปิด 21:00
+          : branchId === "dc38e18a-d7d3-40b5-96aa-d53d1e602c35" ? 20 * 60 + 20 // เพ็ทช็อป-คนอื่น: ปิด 20:00
+          : branchId === "9bc1090c-9585-4b4d-9a27-029999eee73a" ? 20 * 60 + 20 // โกดัง: ปิด 20:00
+          : branchId === "a139c49b-4dc4-44b2-8507-f5a89b61c6d1" ? 19 * 60 + 50 // เมืองเลยสมาร์ทโฟน: ปิด 19:30
+          : 20 * 60 + 20; // ไม่ทราบสาขา: default 20:00
         const worked = Math.min(timeToMinutes(checkOut), OT_CAP_MIN) - timeToMinutes(checkIn);
         const shiftLen = timeToMinutes(String(shift.check_out_time).slice(0, 5)) - timeToMinutes(String(shift.check_in_time).slice(0, 5));
         const extra = worked - shiftLen;
