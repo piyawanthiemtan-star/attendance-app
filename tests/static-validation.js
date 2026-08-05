@@ -53,7 +53,7 @@ assert(attendance.includes('pending_approval') && attendance.includes('openAtten
 assert(attendance.includes("id=\"admin-payroll-link\"") && attendance.includes("role==='owner'?'flex':'none'"), 'HR admin must not see the Payroll system link');
 assert(attendance.includes("btnCheckout.style.display=hasCin&&!hasCout&&!inBreak?'flex':'none'"), 'checkout must be hidden while an employee is on break');
 assert(attendance.includes('ยืนยันว่าจะเช็กเอาต์ก่อนเวลาจริงหรือไม่'), 'early checkout must require an explicit confirmation');
-assert(attendance.includes("navigator.serviceWorker.register('sw.js?v=17')"), 'attendance changes must refresh the production service worker');
+assert(attendance.includes("navigator.serviceWorker.register('sw.js?v=19')"), 'attendance changes must refresh the production service worker');
 assert(attendance.includes('/functions/v1/employee-account-request'), 'employee must be able to request an Email account');
 assert(attendance.includes('/functions/v1/pin-attendance'), 'PIN attendance must go through the protected Edge Function');
 assert(attendance.includes("pinAttendanceRequest('leave_summary')"), 'PIN employees must load only their own leave summary through the Edge Function');
@@ -147,7 +147,7 @@ assert(employeeAccountFunction.includes('employee_account_request_failed'), 'emp
 assert(employeeAccountFunction.includes('account_request_status: "pending"'), 'employee account requests must stay pending for approval');
 
 const pinAttendanceFunction = read('supabase/functions/pin-attendance/index.ts');
-for (const action of ['list_employees', 'leave_summary', 'update_profile_photo', 'change_pin', 'check_in', 'break_start', 'break_end', 'check_out']) {
+for (const action of ['list_employees', 'leave_summary', 'submit_leave', 'update_profile_photo', 'change_pin', 'check_in', 'break_start', 'break_end', 'check_out']) {
   assert(pinAttendanceFunction.includes(`action === "${action}"`), `PIN attendance missing ${action}`);
 }
 assert(pinAttendanceFunction.includes('pin_attendance_auth_failed'), 'PIN attendance must rate limit and audit failed PINs');

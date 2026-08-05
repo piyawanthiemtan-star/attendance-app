@@ -270,6 +270,114 @@ Deno.serve(async (req: Request) => {
     return json(200, { leaves: data ?? [] });
   }
 
+  if (action === "submit_leave") {
+    // พนักงาน PIN ยื่นลาเอง — ตรวจกฎเต็มฝั่ง server (authoritative) แล้ว insert status='pending'
+    const leaveType = String(body.leave_type ?? "");
+    const startDate = String(body.start_date ?? "");
+    const endDate = String(body.end_date ?? "");
+    const reason = String(body.reason ?? "").trim();
+    const note = body.note ? String(body.note) : null;
+    const clientDays = Number(body.days);
+
+    if (!["sick", "personal", "vacation", "unpaid"].includes(leaveType)) {
+      return json(400, { error: "ประเภทการลาไม่ถูกต้อง" });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      return json(400, { error: "กรุณาเลือกวันที่ให้ครบ" });
+    }
+    if (endDate < startDate) return json(400, { error: "วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่มลา" });
+    if (!reason) return json(400, { error: "กรุณาระบุเหตุผลการลา" });
+
+    const utcDays = (a: string, b: string) => {
+      const [ay, am, ad] = a.split("-").map(Number);
+      const [by, bm, bd] = b.split("-").map(Number);
+      return Math.floor((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+    };
+    // จำนวนวัน — คิดฝั่ง server กันปลอมค่า (ครึ่งวัน = วันเดียว 0.5)
+    const isHalf = clientDays === 0.5 && startDate === endDate;
+    const days = isHalf ? 0.5 : utcDays(startDate, endDate) + 1;
+    if (!days || days < 0) return json(400, { error: "ช่วงวันที่ลาไม่ถูกต้อง" });
+
+    const today = bangkokDate();
+    const diffDays = utcDays(today, startDate);        // >0 = อนาคต, <0 = ย้อนหลัง
+    const diffHours = diffDays * 24 - minutesInBangkok() / 60;
+
+    // ข้ามปี (ลากิจ/ลาพักร้อน)
+    if (["personal", "vacation"].includes(leaveType) && startDate.slice(0, 4) !== endDate.slice(0, 4)) {
+      return json(400, { error: "ลากิจและลาพักร้อนที่ข้ามปี ต้องแยกเป็นคำขอของแต่ละปี" });
+    }
+    // ลาพักร้อน — ต้องทำงานครบ 1 ปี
+    if (leaveType === "vacation") {
+      const st = String(employee.start_date ?? "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(st)) {
+        return json(400, { error: "ไม่พบข้อมูลวันที่เริ่มงาน กรุณาให้ HR หรือ Owner ตรวจสอบ" });
+      }
+      const [sy, sm, sd] = st.split("-").map(Number);
+      const maxDay = new Date(Date.UTC(sy + 1, sm, 0)).getUTCDate();
+      const eligibleFrom = `${sy + 1}-${String(sm).padStart(2, "0")}-${String(Math.min(sd, maxDay)).padStart(2, "0")}`;
+      if (startDate < eligibleFrom) {
+        return json(400, { error: `ลาพักร้อนได้ตั้งแต่ทำงานครบ 1 ปี (${eligibleFrom})` });
+      }
+    }
+    // ลากิจ — ยื่นล่วงหน้าอย่างน้อย 14 วัน
+    if (leaveType === "personal" && diffDays < 14) {
+      return json(400, { error: "ลากิจต้องยื่นล่วงหน้าอย่างน้อย 14 วัน" });
+    }
+    // ลาป่วย — ย้อนหลังได้ไม่เกิน 2 วัน / ล่วงหน้าต้องแจ้งก่อน 12 ชม.
+    if (leaveType === "sick") {
+      if (diffDays < 0) {
+        if (diffDays < -2) return json(400, { error: "ลาป่วยย้อนหลังได้ไม่เกิน 2 วัน" });
+      } else if (diffHours < 12) {
+        return json(400, { error: "ลาป่วยล่วงหน้าต้องแจ้งก่อนอย่างน้อย 12 ชั่วโมง (ฉุกเฉินลาย้อนหลังได้ไม่เกิน 2 วัน)" });
+      }
+    }
+
+    // โควตาต่อปี (ลากิจ/ลาพักร้อน) — สิทธิ์: ลากิจ 6 · ลาพักร้อน 6
+    if (["personal", "vacation"].includes(leaveType)) {
+      const quota = leaveType === "personal" ? 6 : 6;
+      const year = Number(startDate.slice(0, 4));
+      const { data: approved, error: quotaErr } = await admin
+        .from("leave_requests")
+        .select("start_date, end_date, days")
+        .eq("employee_id", employee.id)
+        .eq("leave_type", leaveType)
+        .eq("status", "approved")
+        .lte("start_date", `${year}-12-31`)
+        .gte("end_date", `${year}-01-01`);
+      if (quotaErr) return json(500, { error: "ตรวจสอบสิทธิ์วันลาไม่สำเร็จ" });
+      const ys = Date.UTC(year, 0, 1), ye = Date.UTC(year, 11, 31);
+      const usedInYear = (l: { start_date: string; end_date: string; days?: number }) => {
+        const [ly, lm, ld] = l.start_date.split("-").map(Number);
+        const [ey, em, ed] = l.end_date.split("-").map(Number);
+        const ls = Date.UTC(ly, lm - 1, ld), le = Date.UTC(ey, em - 1, ed);
+        const os = Math.max(ys, ls), oe = Math.min(ye, le);
+        if (oe < os) return 0;
+        const overlap = Math.floor((oe - os) / 86400000) + 1;
+        const full = Math.max(1, Math.floor((le - ls) / 86400000) + 1);
+        const rec = Number(l.days) || full;
+        return Math.min(rec, rec * overlap / full);
+      };
+      const used = (approved ?? []).reduce((sum: number, l) => sum + usedInYear(l), 0);
+      if (used + days > quota) {
+        const label = leaveType === "personal" ? "ลากิจ" : "ลาพักร้อน";
+        return json(400, { error: `${label}คงเหลือ ${Math.max(0, quota - used)} วัน (อนุมัติแล้ว ${used} จาก ${quota} วัน)` });
+      }
+    }
+
+    const { data: inserted, error: insertErr } = await admin.from("leave_requests").insert({
+      employee_id: employee.id,
+      leave_type: leaveType,
+      start_date: startDate,
+      end_date: endDate,
+      days,
+      reason,
+      status: "pending",
+      note,
+    }).select().single();
+    if (insertErr) return json(400, { error: "ยื่นคำขอลาไม่สำเร็จ" });
+    return json(200, { leave: inserted });
+  }
+
   if (action === "update_profile_photo") {
     const decoded = decodeProfilePhoto(body.photo_data_url);
     if ("error" in decoded) return json(400, { error: decoded.error });

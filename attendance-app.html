@@ -1519,8 +1519,8 @@ async function initPinAttendanceApp(){
   document.getElementById('nav-leave').style.display='flex';
   document.getElementById('nav-announce').style.display='flex';
   document.getElementById('nav-profile').style.display='flex';
-  document.getElementById('btn-open-leave').style.display='none';
-  document.getElementById('pin-leave-readonly').style.display='block';
+  document.getElementById('btn-open-leave').style.display='block'; // พนักงาน PIN ยื่นลาเองได้ (ส่งผ่าน edge)
+  document.getElementById('pin-leave-readonly').style.display='none';
   clockTick=setInterval(tickClock,1000);tickClock();
   updateHomeStatus();updateClockBtns();renderClockLog();
   showPage('clock');
@@ -1981,7 +1981,10 @@ async function submitLeave(){
   if(!from||!to||!reason){toast('กรุณากรอกข้อมูลให้ครบ');return;}
   const days=half?0.5:inclusiveLeaveDays(from,to);
   if(!days){toast('ช่วงวันที่ลาไม่ถูกต้อง','#E53935');return;}
-  const policyError=await annualLeaveQuotaError(user,selLeaveType,from,to,days);
+  // PIN อ่าน DB ตรงไม่ได้ → เช็คกฎวันที่ฝั่ง client (pure) ส่วนโควตาให้ edge ตรวจ (authoritative)
+  const policyError=loginAuthType==='pin'
+    ? leavePolicyDateError(user,selLeaveType,from,to)
+    : await annualLeaveQuotaError(user,selLeaveType,from,to,days);
   if(policyError){alert('❌ '+policyError);return;}
 
   const now=new Date();
@@ -2021,8 +2024,14 @@ async function submitLeave(){
 
   let note=isBackdate&&selLeaveType==='sick'?'ลาป่วยฉุกเฉิน (ย้อนหลัง)':null;
   if(half)note=note?`ลาครึ่งวัน · ${note}`:'ลาครึ่งวัน';
-  const{error}=await db.from('leave_requests').insert({employee_id:user.id,leave_type:selLeaveType,start_date:from,end_date:to,days,reason,status,note});
-  if(error){toast('Error: '+error.message,'#E53935');return;}
+  if(loginAuthType==='pin'){
+    // ยื่นผ่าน edge (service role) — edge ตรวจกฎเต็ม + insert status='pending'
+    try{await pinAttendanceRequest('submit_leave',{leave_type:selLeaveType,start_date:from,end_date:to,days,reason,note});}
+    catch(err){toast(err.message||'ยื่นคำขอลาไม่สำเร็จ','#E53935');return;}
+  }else{
+    const{error}=await db.from('leave_requests').insert({employee_id:user.id,leave_type:selLeaveType,start_date:from,end_date:to,days,reason,status,note});
+    if(error){toast('Error: '+error.message,'#E53935');return;}
+  }
   closeModal('modal-leave');
   const msg=isBackdate&&selLeaveType==='sick'?'📋 ส่งคำขอลาป่วยฉุกเฉินแล้ว รออนุมัติ HR':'📋 ส่งคำขอลาแล้ว รออนุมัติ';
   toast(msg,'#0B9E82');
@@ -2427,8 +2436,8 @@ async function loadAdminSummary(){
   </div>`;
 }
 async function loadApproveCount(){
-  // HR เห็นเฉพาะที่ต้อง "รับทราบ" (pending) | เจ้าของเห็นที่ต้องตัดสินใจ (pending + รับทราบแล้ว)
-  const statuses=user.role==='owner'?['pending','acknowledged']:['pending'];
+  // บังคับลำดับ: HR รับทราบ (pending) ก่อน → Owner ถึงจะเห็น/อนุมัติ (acknowledged เท่านั้น)
+  const statuses=user.role==='owner'?['acknowledged']:['pending'];
   const{data}=await db.from('leave_requests').select('id').in('status',statuses);
   const n=data?.length||0;
   const label=user.role==='owner'?'รออนุมัติ ':'รอรับทราบ ';
@@ -2439,8 +2448,8 @@ async function loadApproveCount(){
 // APPROVE
 async function loadApproveList(){
   const isOwner=user.role==='owner';
-  // เจ้าของเห็นทั้งที่ยังไม่รับทราบ + รับทราบแล้ว | HR เห็นเฉพาะที่รอรับทราบ
-  const statuses=isOwner?['pending','acknowledged']:['pending'];
+  // บังคับลำดับ: HR รับทราบก่อน → Owner เห็นเฉพาะที่ HR รับทราบแล้ว (acknowledged) | HR เห็นเฉพาะที่รอรับทราบ (pending)
+  const statuses=isOwner?['acknowledged']:['pending'];
   const{data}=await db.from('leave_requests').select('*, employees(name,department)').in('status',statuses).order('created_at');
   const el=document.getElementById('approve-list');
   if(!data?.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">${isOwner?'ไม่มีคำขอรออนุมัติ':'ไม่มีคำขอรอรับทราบ'}</div></div>`;return;}
@@ -4283,7 +4292,7 @@ async function loadMyPayslip(){
 </script>
 <script>
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=18').catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=19').catch(()=>{});
 }
 </script>
 </body>
