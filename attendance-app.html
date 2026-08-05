@@ -1843,7 +1843,7 @@ async function loadLeave(){
   });
   const el=document.getElementById('leave-history');
   if(!data?.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">ยังไม่มีประวัติการลา</div><div class="empty-sub">กดปุ่มด้านบนเพื่อยื่นคำขอลา</div></div>';return;}
-  const isHROwner = user.role==='hr'||user.role==='owner';
+  const isHROwner = (user.role==='hr'||user.role==='owner') && loginAuthType!=='pin'; // PIN ลบผ่าน DB ตรงไม่ได้
   el.innerHTML=data.map(l=>`<div class="leave-item">
     <div class="leave-item-head">
       <span style="font-size:13px;font-weight:600">${LLABELS[l.leave_type]||l.leave_type} · ${l.days} วัน</span>
@@ -1865,7 +1865,8 @@ async function openLeaveModal(){
   document.getElementById('leave-from').value=todayStr();
   document.getElementById('leave-to').value=todayStr();
   toggleHalfDay();
-  const isHROrOwner = user.role==='hr'||user.role==='owner';
+  // เข้าผ่าน PIN เขียน DB ตรงไม่ได้ → บังคับใช้โหมด "ยื่นเอง" (ผ่าน edge) แม้ role จะเป็น HR/Owner
+  const isHROrOwner = (user.role==='hr'||user.role==='owner') && loginAuthType!=='pin';
   const empSection = document.getElementById('leave-emp-section');
   if(empSection) empSection.style.display = isHROrOwner ? 'block' : 'none';
   // แสดงปุ่มตาม role
@@ -4292,7 +4293,7 @@ async function loadMyPayslip(){
 </script>
 <script>
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=19').catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=20').catch(()=>{});
 }
 </script>
 </body>
