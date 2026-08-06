@@ -319,16 +319,15 @@ Deno.serve(async (req: Request) => {
         return json(400, { error: `ลาพักร้อนได้ตั้งแต่ทำงานครบ 1 ปี (${eligibleFrom})` });
       }
     }
-    // ลากิจ — ยื่นล่วงหน้าอย่างน้อย 14 วัน
-    if (leaveType === "personal" && diffDays < 14) {
-      return json(400, { error: "ลากิจต้องยื่นล่วงหน้าอย่างน้อย 14 วัน" });
-    }
-    // ลาป่วย — ย้อนหลังได้ไม่เกิน 2 วัน / ล่วงหน้าต้องแจ้งก่อน 12 ชม.
+    // แจ้งล่วงหน้าน้อยกว่ากำหนด (ลากิจ<14วัน / ลาป่วยล่วงหน้า<12ชม.) — ไม่บล็อก แต่ติดธงให้ HR/Owner เห็นตอนพิจารณา
+    let lateNotice = false;
+    if (leaveType === "personal" && diffDays < 14) lateNotice = true;
     if (leaveType === "sick") {
       if (diffDays < 0) {
+        // ลาป่วยย้อนหลัง — เกิน 2 วันยังบล็อก (กันย้อนหลังมั่ว)
         if (diffDays < -2) return json(400, { error: "ลาป่วยย้อนหลังได้ไม่เกิน 2 วัน" });
       } else if (diffHours < 12) {
-        return json(400, { error: "ลาป่วยล่วงหน้าต้องแจ้งก่อนอย่างน้อย 12 ชั่วโมง (ฉุกเฉินลาย้อนหลังได้ไม่เกิน 2 วัน)" });
+        lateNotice = true;
       }
     }
 
@@ -364,6 +363,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const noteFlag = "⚠️ แจ้งล่วงหน้าน้อยกว่ากำหนด";
+    const finalNote = lateNotice && !(note && note.includes(noteFlag))
+      ? (note ? `${note} · ${noteFlag}` : noteFlag)
+      : note;
     const { data: inserted, error: insertErr } = await admin.from("leave_requests").insert({
       employee_id: employee.id,
       leave_type: leaveType,
@@ -372,9 +375,9 @@ Deno.serve(async (req: Request) => {
       days,
       reason,
       status: "pending",
-      note,
+      note: finalNote,
     }).select().single();
-    if (insertErr) return json(400, { error: "ยื่นคำขอลาไม่สำเร็จ" });
+    if (insertErr) return json(400, { error: "ยื่นคำขอลาไม่สำเร็จ [" + (insertErr.code || "") + "] " + (insertErr.message || insertErr.details || "") });
     return json(200, { leave: inserted });
   }
 

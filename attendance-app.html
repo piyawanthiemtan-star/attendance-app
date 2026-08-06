@@ -1078,6 +1078,23 @@ input,select,textarea,button{font-family:'Noto Sans Thai','Helvetica Neue',Arial
   </div>
 </div>
 
+<!-- LATE-NOTICE WARNING MODAL (เตือนแดง แล้วให้ผ่านไป HR) -->
+<div class="modal-overlay" id="modal-late-warn">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div style="text-align:center;padding:6px 0 2px">
+      <div style="font-size:46px;line-height:1">⚠️</div>
+      <div style="font-size:19px;font-weight:800;color:#C62828;margin-top:6px">แจ้งล่วงหน้าไม่ครบกำหนด</div>
+    </div>
+    <div id="late-warn-msg" style="background:#FDECEA;border:1.5px solid #E53935;border-radius:12px;padding:14px;color:#B71C1C;font-size:15px;font-weight:700;text-align:center;margin:12px 0;line-height:1.5"></div>
+    <div style="font-size:13px;color:var(--text3);text-align:center;margin-bottom:16px">คำขอนี้จะถูกส่งให้ HR/หัวหน้าพิจารณาอนุมัติตามเหตุผลของคุณ</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-reject" style="flex:1" onclick="resolveLateWarn(false)">ยกเลิก</button>
+      <button class="btn-approve" style="flex:1" onclick="resolveLateWarn(true)">✔ ยืนยันส่งคำขอ</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- SHIFT SELECT MODAL -->
 <div class="modal-overlay" id="modal-shift-select">
@@ -1353,6 +1370,19 @@ function av(name,i){const[bg,tx]=AV[i%5];return`background:${bg};color:${tx}`;}
 function calcDist(a,b,c,d){const R=6371000,dL=(c-a)*Math.PI/180,dl=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dl/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
 function openModal(id){document.getElementById(id).classList.add('show');}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
+
+// กล่องเตือน "แจ้งล่วงหน้าไม่ครบกำหนด" — คืน Promise<boolean> (true=ยืนยันส่งต่อให้ HR)
+let _lateWarnResolve=null;
+function confirmLateNotice(message){
+  document.getElementById('late-warn-msg').textContent=message;
+  openModal('modal-late-warn');
+  return new Promise(resolve=>{_lateWarnResolve=resolve;});
+}
+function resolveLateWarn(ok){
+  closeModal('modal-late-warn');
+  const resolve=_lateWarnResolve;_lateWarnResolve=null;
+  if(resolve)resolve(ok);
+}
 
 // AUTH
 function setLoginMode(mode){
@@ -1996,24 +2026,25 @@ async function submitLeave(){
   let isBackdate=diffDays<0;
   let status='pending';
   let errMsg='';
+  let lateWarn=''; // ผิดกำหนดแจ้งล่วงหน้า — ไม่บล็อก แต่เตือนแดง + ส่งให้ HR พิจารณา
 
   if(selLeaveType==='personal'){
-    // ลากิจ ต้องล่วงหน้า 14 วัน
+    // ลากิจ ควรล่วงหน้า 14 วัน — ไม่ถึง = เตือน (ไม่บล็อก)
     if(diffDays<14){
-      errMsg=`❌ ลากิจต้องยื่นล่วงหน้าอย่างน้อย 14 วัน\nวันที่เร็วที่สุดที่ลากิจได้: ${new Date(todayMidnight.getTime()+14*86400000).toLocaleDateString('th-TH')}`;
+      lateWarn=`ลากิจปกติต้องยื่นล่วงหน้าอย่างน้อย 14 วัน (เร็วที่สุด ${new Date(todayMidnight.getTime()+14*86400000).toLocaleDateString('th-TH')})`;
     }
   } else if(selLeaveType==='sick'){
     if(isBackdate){
-      // ลาป่วยย้อนหลัง — ได้ไม่เกิน 2 วัน
+      // ลาป่วยย้อนหลัง — เกิน 2 วันยังบล็อก (กันย้อนหลังมั่ว)
       if(diffDays<-2){
         errMsg='❌ ลาป่วยย้อนหลังได้ไม่เกิน 2 วัน';
       }
       // ย้อนหลังต้องรออนุมัติ HR
       status='pending';
     } else {
-      // ลาป่วยล่วงหน้า ต้องแจ้งก่อน 12 ชม.
+      // ลาป่วยล่วงหน้า ควรแจ้งก่อน 12 ชม. — ไม่ถึง = เตือน (ไม่บล็อก)
       if(diffHours<12){
-        errMsg='❌ ลาป่วยล่วงหน้าต้องแจ้งก่อนอย่างน้อย 12 ชั่วโมง\nหากป่วยฉุกเฉิน สามารถลาย้อนหลังได้ไม่เกิน 2 วัน';
+        lateWarn='ลาป่วยปกติควรแจ้งล่วงหน้าอย่างน้อย 12 ชั่วโมง';
       }
     }
   }
@@ -2022,8 +2053,13 @@ async function submitLeave(){
     alert(errMsg);
     return;
   }
+  if(lateWarn){
+    const proceed=await confirmLateNotice(lateWarn);
+    if(!proceed)return;
+  }
 
   let note=isBackdate&&selLeaveType==='sick'?'ลาป่วยฉุกเฉิน (ย้อนหลัง)':null;
+  if(lateWarn)note=note?`${note} · ⚠️ แจ้งล่วงหน้าน้อยกว่ากำหนด`:'⚠️ แจ้งล่วงหน้าน้อยกว่ากำหนด';
   if(half)note=note?`ลาครึ่งวัน · ${note}`:'ลาครึ่งวัน';
   if(loginAuthType==='pin'){
     // ยื่นผ่าน edge (service role) — edge ตรวจกฎเต็ม + insert status='pending'
@@ -4293,7 +4329,7 @@ async function loadMyPayslip(){
 </script>
 <script>
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js?v=20').catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=21').catch(()=>{});
 }
 </script>
 </body>
