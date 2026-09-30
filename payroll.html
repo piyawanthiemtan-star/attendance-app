@@ -358,6 +358,10 @@ function goPayrollHome(){
   switchTab('summary');
   window.scrollTo({top:0,behavior:'smooth'});
 }
+// พนักงานที่อยู่ในรอบเงินเดือน: ไม่ถูกตั้งยกเว้น และไม่ใช่ลาออก
+// [Owner เคาะ 30 ก.ย. 2569] กดลาออกแล้ว = ไม่ดึงเข้าเงินเดือนเลย (เบิกล่วงหน้า/สิ้นเดือน) — Owner/HR เคลียร์ค่าจ้างค้างนอกระบบเอง
+// ประวัติรอบเก่ายังหาชื่อได้ (ค้นด้วย allEmps.find ไม่ผ่านตัวกรองนี้)
+function inPayroll(e){return !!e&&e.payroll_eligible!==false&&e.status!=='resigned';}
 function employeeEligibleForPeriod(employee,start,end){
   if(employee.start_date&&employee.start_date>end)return false;
   if(employee.resigned_at&&employee.resigned_at<start)return false;
@@ -367,12 +371,12 @@ function eligibleEmployeesForRun(run){
   const[y,m]=run.year_month.trim().split('-');
   const start=`${y}-${m}-01`;
   const end=`${y}-${m}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
-  if(run.run_type!=='advance')return allEmps.filter(employee=>employee.payroll_eligible!==false&&employeeEligibleForPeriod(employee,start,end));
+  if(run.run_type!=='advance')return allEmps.filter(employee=>inPayroll(employee)&&employeeEligibleForPeriod(employee,start,end));
   const payDate=new Date((run.pay_date||`${y}-${m}-15`)+'T00:00:00');
   const activeOnPayDate=dateStr(payDate);
   payDate.setMonth(payDate.getMonth()-1);
   const tenureCutoff=dateStr(payDate);
-  return allEmps.filter(employee=>employee.payroll_eligible!==false&&employeeEligibleForPeriod(employee,activeOnPayDate,activeOnPayDate)
+  return allEmps.filter(employee=>inPayroll(employee)&&employeeEligibleForPeriod(employee,activeOnPayDate,activeOnPayDate)
     &&(!employee.start_date||employee.start_date<=tenureCutoff));
 }
 function workPatternForDate(patterns,employeeId,date){
@@ -473,7 +477,7 @@ async function loadMainData(){
   paymentTracking=paymentResult.data||[];
 
   const advSel=document.getElementById('adv-emp');
-  allEmps.filter(e=>e.payroll_eligible!==false).forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.name;advSel.appendChild(o);});
+  allEmps.filter(e=>inPayroll(e)).forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.name;advSel.appendChild(o);});
 
   loadSummary();loadRuns();if(isOwner)loadSalaryEmpList();loadAdvanceList();
 }
@@ -512,7 +516,7 @@ async function loadSummary(){
   let totalBase=0,totalOther=0,totalGross=0,totalNet=0,totalDed=0,totalOT=0;
   // เรียงตามเลขที่ใส่ไว้หน้าชื่อ (เช่น "1.นาย…") แบบตัวเลขจริง คนที่ไม่ใส่เลขไปอยู่ท้าย
   const leadNum=n=>{const mm=String(n||'').match(/^\s*(\d+)/);return mm?parseInt(mm[1],10):999999;};
-  const visibleEmps=(isOwner?allEmps:allEmps.filter(e=>e.id===currentUser?.id)).filter(e=>e.payroll_eligible!==false).slice().sort((a,b)=>leadNum(a.name)-leadNum(b.name));
+  const visibleEmps=(isOwner?allEmps:allEmps.filter(e=>e.id===currentUser?.id)).filter(e=>inPayroll(e)).slice().sort((a,b)=>leadNum(a.name)-leadNum(b.name));
   const subList=(items,red)=>{
     const r=items.filter(x=>Number(x[1])).map(x=>`<div style="display:flex;justify-content:space-between;gap:8px"><span style="color:var(--text3)">${x[0]}</span><span${red?' style="color:var(--red)"':''}>${fmt(x[1])}</span></div>`);
     return r.length?r.join(''):'<span style="color:var(--text3)">–</span>';
@@ -716,7 +720,7 @@ async function printAllPayslips(){
     db.from('payroll_items').select('employee_id,advance_principal_paid,payroll_runs!inner(year_month,run_type,status)').eq('payroll_runs.year_month',ym).eq('payroll_runs.run_type','advance').in('payroll_runs.status',['confirmed','paid']).eq('payment_status','paid')
   ]);
   const leadNum=n=>{const mm=String(n||'').match(/^\s*(\d+)/);return mm?parseInt(mm[1],10):999999;};
-  const emps=allEmps.filter(e=>e.payroll_eligible!==false).slice().sort((a,b)=>leadNum(a.name)-leadNum(b.name));
+  const emps=allEmps.filter(e=>inPayroll(e)).slice().sort((a,b)=>leadNum(a.name)-leadNum(b.name));
   const f=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
   const daysInMonth=new Date(y,m,0).getDate();
   const row=(label,val,neg)=>Number(val)?`<tr><td>${escapeHtmlPs(label)}</td><td style="text-align:right${neg?';color:#c00':''}">${neg?'(':''}฿${f(val)}${neg?')':''}</td></tr>`:'';
@@ -1220,7 +1224,7 @@ async function confirmRun(id){
 // ──────────── SALARY CONFIG ────────────
 function loadSalaryEmpList(){
   const el=document.getElementById('salary-emp-list');
-  el.innerHTML=allEmps.filter(emp=>emp.payroll_eligible!==false).map((emp,i)=>{
+  el.innerHTML=allEmps.filter(emp=>inPayroll(emp)).map((emp,i)=>{
     const cfg=salaryConfigs.find(c=>c.employee_id===emp.id);
     const[bg,tx]=AV[i%5];
     return`<div class="emp-row" onclick="openSalaryModal('${emp.id}')">
